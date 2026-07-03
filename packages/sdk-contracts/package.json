@@ -1,0 +1,50 @@
+{
+  "name": "@onborn/sdk-contracts",
+  "version": "0.1.0-beta.0",
+  "description": "Runtime-safe contracts used by Onborn client SDKs.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onborn/onborn-react-native.git",
+    "directory": "packages/sdk-contracts"
+  },
+  "bugs": {
+    "url": "https://github.com/onborn/onborn-react-native/issues"
+  },
+  "homepage": "https://github.com/onborn/onborn-react-native#readme",
+  "private": false,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2"
+  }
+}

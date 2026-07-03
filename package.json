@@ -1,0 +1,23 @@
+{
+  "name": "onborn-react-native",
+  "private": true,
+  "packageManager": "yarn@1.22.22",
+  "engines": {
+    "node": ">=18"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "check-types": "turbo run check-types",
+    "sdk:release-check": "./scripts/sdk-release-check.sh"
+  },
+  "devDependencies": {
+    "prettier": "^3.7.4",
+    "turbo": "^2.9.12",
+    "typescript": "5.9.2"
+  }
+}
