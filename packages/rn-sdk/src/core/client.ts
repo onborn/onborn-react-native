@@ -29,7 +29,6 @@ import {
   type PurchaseRequestOptions,
 } from "../config/fetcher";
 import { resolveRuntimeLocale } from "../config/locale";
-import { getOnbornApiBaseUrl } from "../config/runtime";
 
 export type ConversionFlowClientOptions = {
   apiKey: string;
@@ -621,7 +620,6 @@ export class ConversionFlowClient {
   ): AnalyticsClientOptions {
     return {
       apiKey: options.apiKey,
-      baseUrl: getOnbornApiBaseUrl(),
       appId: options.appId ?? "onborn.app",
       platform: options.platform ?? inferPlatform(),
       locale: options.locale,

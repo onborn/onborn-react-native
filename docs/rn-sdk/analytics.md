@@ -16,7 +16,6 @@ yarn add @onborn/analytics
 import { createAnalyticsClient } from "@onborn/analytics";
 
 const analytics = createAnalyticsClient({
-  baseUrl: "https://api.testing.onborn.app",
   apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
   appId: "ios-app",
   platform: "ios",
@@ -25,8 +24,8 @@ const analytics = createAnalyticsClient({
 });
 ```
 
-`baseUrl` is required for the standalone analytics package. The React Native SDK
-uses the package-owned Onborn API URL internally.
+The Onborn API URL is package-owned. Apps provide an SDK API key and runtime
+context, not a backend URL.
 
 ## Track an event
 
@@ -47,14 +46,13 @@ Events are queued and flushed in batches.
 
 ```ts
 const analytics = createAnalyticsClient({
-  baseUrl: "https://api.testing.onborn.app",
   apiKey,
   appId: "ios-app",
   platform: "ios",
   appVersion: "1.0.0",
   sdkVersion: "0.1.0-beta.0",
-  flushAt: 10,
-  flushIntervalMs: 10_000,
+  maxBatchSize: 10,
+  autoFlushMs: 10_000,
   maxQueueSize: 500,
 });
 ```
@@ -80,7 +78,6 @@ const storage: AnalyticsStorage = {
 };
 
 const analytics = createAnalyticsClient({
-  baseUrl,
   apiKey,
   appId,
   platform: "ios",
@@ -118,14 +115,14 @@ Use stable `sessionId` values so Onborn can connect events into a funnel.
 
 ## Error handling
 
-`track()` queues locally. `flush()` sends queued events to Onborn and may throw
-when the network or backend rejects the batch.
+`track()` queues locally. `flush()` sends queued events to Onborn and returns a
+summary of attempted, sent, failed, and remaining events.
 
 ```ts
-try {
-  await analytics.flush();
-} catch (error) {
-  console.warn("Failed to flush Onborn analytics", error);
+const summary = await analytics.flush();
+
+if (summary.remaining > 0) {
+  console.warn("Some Onborn analytics events are still queued", summary);
 }
 ```
 

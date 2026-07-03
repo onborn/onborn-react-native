@@ -7,10 +7,10 @@ import { MemoryAnalyticsStorage, type AnalyticsStorage } from "./storage";
 const DEFAULT_QUEUE_KEY = "onborn:analytics:queue";
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_MAX_QUEUE_SIZE = 1000;
+const DEFAULT_ONBORN_API_BASE_URL = "https://api.testing.onborn.app";
 
 export type AnalyticsClientOptions = {
   apiKey: string;
-  baseUrl: string;
   appId: string;
   platform: AnalyticsPlatform;
   locale?: string;
@@ -71,7 +71,7 @@ export class AnalyticsClient {
       options.maxQueueSize ?? DEFAULT_MAX_QUEUE_SIZE,
     );
 
-    this.endpoint = buildEventsEndpoint(options.baseUrl);
+    this.endpoint = buildEventsEndpoint(DEFAULT_ONBORN_API_BASE_URL);
   }
 
   async track(input: TrackEventInput): Promise<AnalyticsEvent> {

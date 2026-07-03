@@ -9,7 +9,6 @@ events without rendering an Onborn subscription flow.
 import { createAnalyticsClient } from "@onborn/analytics";
 
 const analytics = createAnalyticsClient({
-  baseUrl: "https://api.testing.onborn.app",
   apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
   appId: "my-ios-app",
   platform: "ios",
@@ -30,6 +29,9 @@ await analytics.flush();
 The React Native SDK configures persistent queue storage automatically. When
 using this package directly, provide your own `storage` implementation if events
 should survive app restarts.
+
+The Onborn API URL is package-owned. Apps provide an SDK API key and runtime
+context, not a backend URL.
 
 ## Documentation
 
