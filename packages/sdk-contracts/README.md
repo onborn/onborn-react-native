@@ -14,3 +14,9 @@ SDKs:
 It must not expose backend, dashboard, builder, AI, provider credential, or
 template-management contracts. Keep those in private internal workspace
 packages.
+
+## Documentation
+
+- [SDK contracts docs](../../docs/rn-sdk/sdk-contracts.md)
+- [React Native SDK docs](../../docs/rn-sdk/rn-sdk.md)
+- [Analytics docs](../../docs/rn-sdk/analytics.md)

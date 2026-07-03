@@ -30,3 +30,9 @@ await analytics.flush();
 The React Native SDK configures persistent queue storage automatically. When
 using this package directly, provide your own `storage` implementation if events
 should survive app restarts.
+
+## Documentation
+
+- [Analytics docs](../../docs/rn-sdk/analytics.md)
+- [React Native SDK docs](../../docs/rn-sdk/rn-sdk.md)
+- [SDK contracts docs](../../docs/rn-sdk/sdk-contracts.md)

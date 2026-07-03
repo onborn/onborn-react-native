@@ -88,16 +88,11 @@ function InitialLoading({ kind }: InitialLoadingComponentProps) {
 />;
 ```
 
-## Docs
+## Documentation
 
-Full docs live in:
+Full GitHub-rendered docs:
 
-```text
-docs/rn-sdk/rn-sdk.md
-```
-
-Release readiness checklist:
-
-```text
-docs/rn-sdk/release-readiness.md
-```
+- [React Native SDK](../../docs/rn-sdk/rn-sdk.md)
+- [Analytics](../../docs/rn-sdk/analytics.md)
+- [SDK contracts](../../docs/rn-sdk/sdk-contracts.md)
+- [Release readiness](../../docs/rn-sdk/release-readiness.md)
