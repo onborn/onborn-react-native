@@ -2,30 +2,40 @@
 
 Public React Native SDK repository for Onborn onboarding flows, paywalls, and analytics.
 
-## Packages
+## React Native SDK
 
-- `@onborn/rn-sdk` renders onboarding flows and paywalls in React Native / Expo apps.
-- `@onborn/analytics` sends Onborn analytics events without rendering a flow.
-- `@onborn/sdk-contracts` contains runtime-safe schemas and types used by the public SDK packages.
+Render Onborn onboarding flows and paywalls in React Native / Expo apps.
 
-## Example
+Start with the full SDK documentation:
 
-The Expo example app lives in `apps/example-expo`.
+- [React Native SDK documentation](docs/rn-sdk/rn-sdk.md)
+
+## Standalone Analytics
+
+Use `@onborn/analytics` directly when you want to send Onborn analytics events
+without rendering an Onborn flow or paywall.
+
+- [Standalone analytics documentation](docs/rn-sdk/analytics.md)
+
+## Example App
+
+The Expo example app lives in `apps/example-expo` and demonstrates:
+
+- rendering an onboarding flow,
+- rendering a standalone paywall,
+- mock billing,
+- custom loading UI,
+- native custom step rendering,
+- Lottie animated assets.
 
 ```sh
 yarn install
 yarn workspace @onborn/example-expo start
 ```
 
-## Release checks
+## Contracts
 
-```sh
-yarn sdk:release-check
-```
+`@onborn/sdk-contracts` contains runtime-safe schemas and types used by the
+public SDK packages.
 
-## Documentation
-
-- [React Native SDK](docs/rn-sdk/rn-sdk.md)
-- [Analytics](docs/rn-sdk/analytics.md)
-- [SDK contracts](docs/rn-sdk/sdk-contracts.md)
-- [Release readiness](docs/rn-sdk/release-readiness.md)
+- [SDK contracts documentation](docs/rn-sdk/sdk-contracts.md)

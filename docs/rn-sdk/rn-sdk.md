@@ -450,6 +450,5 @@ Check:
 
 Before public release, see:
 
-- `docs/rn-sdk/release-readiness.md`
 
 That file tracks package blockers, release checklist, test matrix, and beta scope.
