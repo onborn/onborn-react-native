@@ -95,23 +95,99 @@ You only need to pass storage when using `@onborn/analytics` directly.
 The event union is exported from `@onborn/sdk-contracts` and includes:
 
 - `flow_started`
-- `flow_completed`
 - `step_viewed`
 - `step_completed`
 - `step_skipped`
-- `quiz_answered`
+- `flow_completed`
 - `paywall_viewed`
-- `paywall_closed`
-- `package_selected`
-- `purchase_started`
-- `trial_started`
-- `purchase_failed`
-- `purchase_converted`
-- `restore_started`
-- `restore_completed`
-- `legal_link_opened`
+- `paywall_dismissed`
+- `paywall_package_selected`
+- `paywall_link_pressed`
+- `paywall_purchase_started`
+- `paywall_trial_started`
+- `paywall_purchase_failed`
+- `paywall_converted`
+- `paywall_restore_started`
+- `paywall_restore_completed`
+- `paywall_restore_failed`
+- `sdk_connection_established`
+
+Question answers are stored on `step_completed.answer`; the SDK does not emit a
+separate quiz-answer event.
 
 Use stable `sessionId` values so Onborn can connect events into a funnel.
+
+Every event includes the same base context: `eventId`, `flowId`, `sessionId`,
+`userId`, `appId`, `timestamp`, `platform`, `appVersion`, `sdkVersion`, optional
+`locale`, `country`, `userType`, and optional experiment fields
+`experimentId`, `experimentVariantId`, and `experimentAssignmentId`.
+
+Paywall lifecycle events also include paywall context. When you track these
+manually, include `stepId` and `paywallTemplate`; include `paywallId` when a
+published paywall id is available. Package/purchase events should include
+`packageId` and `productId` when known.
+
+## Dashboard metric definitions
+
+Onborn uses session-based counts where possible so duplicate flushes or reloads
+do not inflate conversion rates. The raw event stream still shows every accepted
+event for debugging.
+
+| Metric | Definition | Source events |
+| --- | --- | --- |
+| Funnel starts | Unique sessions that started a flow. | `flow_started` |
+| Completed onboarding count | Unique sessions that completed a flow. | `flow_completed` |
+| Onboarding completion rate | Completed sessions divided by funnel starts. | `flow_started`, `flow_completed` |
+| Step continue rate | Sessions completing a step divided by sessions viewing it. | `step_viewed`, `step_completed` |
+| Step drop-off rate | Sessions viewing a step but not completing it divided by sessions viewing it. | `step_viewed`, `step_completed` |
+| Average time per step | Average `timeSpentMs` for completed step events. | `step_completed.timeSpentMs` |
+| Answer distribution | Counts and percentages of answers selected on quiz/input/metrics steps. | `step_completed.answer` |
+| Paywall view rate | Sessions reaching a paywall divided by funnel starts. | `flow_started`, `paywall_viewed` |
+| Trial start rate | Sessions with trial intent divided by paywall views. | `paywall_viewed`, `paywall_trial_started` |
+| Purchase tap rate | Sessions tapping purchase divided by paywall views. | `paywall_viewed`, `paywall_purchase_started` |
+| Purchase success rate | Converted purchase sessions divided by purchase-start sessions. | `paywall_purchase_started`, `paywall_converted` |
+| Close rate | Sessions dismissing a paywall divided by paywall views. | `paywall_viewed`, `paywall_dismissed` |
+| Revenue per view | Revenue divided by paywall views. | `paywall_viewed`, `paywall_converted` |
+
+Revenue cards require purchase validation or provider lifecycle data with price
+and currency information. If you manually track standalone paywalls, include
+`productId`, `packageId`, and `priceUsd` when known.
+
+## Standalone paywall sequence
+
+If you render your own paywall and only use Onborn analytics, emit the same
+sequence that `@onborn/rn-sdk` would emit:
+
+```ts
+const common = {
+  flowId: "paywall:main",
+  sessionId: "session-123",
+  userId: "user-123",
+  stepId: "paywall:main:screen",
+  paywallId: "main-paywall",
+  paywallTemplate: "Main paywall",
+};
+
+await analytics.track({ ...common, type: "paywall_viewed" });
+await analytics.track({
+  ...common,
+  type: "paywall_package_selected",
+  packageId: "annual",
+  productId: "com.app.annual",
+});
+await analytics.track({
+  ...common,
+  type: "paywall_purchase_started",
+  packageId: "annual",
+  productId: "com.app.annual",
+});
+await analytics.track({
+  ...common,
+  type: "paywall_converted",
+  productId: "com.app.annual",
+  priceUsd: 59.99,
+});
+```
 
 ## Error handling
 

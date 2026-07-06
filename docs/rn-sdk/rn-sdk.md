@@ -11,31 +11,133 @@ Primary runtime components:
 - `useOnbornPaywall` for headless/custom paywall runtime.
 - Billing adapters for mock billing, RevenueCat, and custom native-store implementations.
 
-## Install
+## Install package
+
+Yarn:
 
 ```sh
 yarn add @onborn/rn-sdk
 ```
 
-Required peer dependencies:
+NPM:
 
 ```sh
-yarn add react-native-safe-area-context react-native-svg react-native-reanimated react-native-worklets
+npm install @onborn/rn-sdk
 ```
 
-Expo/runtime dependencies used by the SDK:
+PNPM:
 
 ```sh
-yarn add expo-font expo-image expo-linear-gradient expo-localization expo-store-review expo-video
+pnpm add @onborn/rn-sdk
+```
+
+The SDK owns the Onborn API URL. Apps provide an SDK API key and runtime
+context, not a backend base URL.
+
+## Expo setup
+
+Required peer dependencies:
+
+Yarn:
+
+```sh
+yarn add react-native-reanimated react-native-worklets
+```
+
+NPM:
+
+```sh
+npm install react-native-reanimated react-native-worklets
+```
+
+PNPM:
+
+```sh
+pnpm add react-native-reanimated react-native-worklets
+```
+
+Reanimated requires the babel plugin. Keep it last:
+
+```js
+module.exports = {
+  presets: ["babel-preset-expo"],
+  plugins: ["react-native-reanimated/plugin"],
+};
 ```
 
 Optional dependencies:
+
+Yarn:
 
 ```sh
 yarn add lottie-react-native
 ```
 
+NPM:
+
+```sh
+npm install lottie-react-native
+```
+
+PNPM:
+
+```sh
+pnpm add lottie-react-native
+```
+
 Use `lottie-react-native` only if your flows include animated assets.
+
+The SDK bundles `react-native-safe-area-context`, `react-native-svg`, `expo-font`,
+`expo-image`, `expo-linear-gradient`, `expo-localization`, `expo-store-review`,
+`expo-video`, Tamagui, and supported font packages. Install those directly only
+if your app uses them outside Onborn.
+
+Expo apps are the primary supported path. Use an Expo development build. Expo Go
+is not supported for a real Onborn integration because Reanimated, Worklets,
+optional Lottie, and native billing modules must be included in your app binary.
+
+## Bare React Native setup
+
+Bare React Native apps can use the SDK, but they must support Expo Modules
+because the runtime uses Expo packages for images, fonts, gradients,
+localization, store review, and video primitives.
+
+```sh
+yarn add react-native-reanimated react-native-worklets
+npx pod-install
+```
+
+NPM:
+
+```sh
+npm install react-native-reanimated react-native-worklets
+npx pod-install
+```
+
+PNPM:
+
+```sh
+pnpm add react-native-reanimated react-native-worklets
+pnpm exec pod-install
+```
+
+```js
+module.exports = {
+  presets: ["module:@react-native/babel-preset"],
+  plugins: [
+    // Must stay last.
+    "react-native-reanimated/plugin",
+  ],
+};
+```
+
+Bare RN checklist:
+
+- Confirm Expo Modules autolinking is configured.
+- Run pods after installing native packages.
+- Keep the Reanimated babel plugin last.
+- Rebuild the native app after dependency changes.
+- Install `lottie-react-native` only if your published flows use animated assets.
 
 ## Quick Start
 
@@ -57,18 +159,6 @@ export function OnboardingScreen() {
     </View>
   );
 }
-```
-
-The SDK fetches:
-
-```text
-GET /flows/:flowId
-```
-
-and sends analytics to:
-
-```text
-POST /events
 ```
 
 The backend decides which published flow or experiment variant should be returned.
@@ -93,12 +183,6 @@ export function PaywallScreen() {
     </View>
   );
 }
-```
-
-The SDK fetches:
-
-```text
-GET /paywalls/:paywallId
 ```
 
 Standalone paywalls are useful for feature gates, settings screens, or upgrade screens that are not part of an onboarding flow.
@@ -148,32 +232,19 @@ Pass these fields whenever possible:
 
 These values are used for:
 
-- analytics segmentation,
+- published runtime selection and mobile debugging,
 - experiment targeting,
 - localized runtime payloads,
 - platform-specific billing products.
 
-## Analytics
+## Runtime analytics behavior
 
-The SDK automatically tracks:
+The React Native SDK emits flow, step, paywall, purchase, restore, and legal-link
+events automatically. For app builds, keep analytics enabled because Insights,
+Analytics, Experiments, benchmarks, and assistant recommendations depend on
+complete event data.
 
-- `flow_started`
-- `step_viewed`
-- `step_completed`
-- `step_skipped`
-- `flow_completed`
-- `paywall_viewed`
-- `paywall_package_selected`
-- `paywall_purchase_started`
-- `paywall_trial_started`
-- `paywall_purchase_failed`
-- `paywall_restore_started`
-- `paywall_restore_completed`
-- `paywall_restore_failed`
-- `paywall_converted`
-- `paywall_link_pressed`
-
-Analytics can be disabled for internal previews:
+Disable runtime analytics only for internal previews or test harnesses:
 
 ```tsx
 import { createClient } from "@onborn/rn-sdk";
@@ -193,6 +264,9 @@ default. Events can survive an app restart and flush when connectivity returns.
 The queue is capped by default to avoid unbounded local storage growth.
 The SDK also flushes analytics when the app moves between active/background
 states and when the flow/paywall component unmounts.
+
+For event schemas, metric definitions, and standalone event tracking, see
+[`analytics.md`](./analytics.md).
 
 ## Billing
 
@@ -228,7 +302,10 @@ function Screen() {
 
 ### RevenueCat
 
-Use RevenueCat when the host app already uses RevenueCat as the subscription provider.
+Use RevenueCat when the host app already uses RevenueCat as the subscription
+provider or when you are migrating gradually. New apps that want Onborn to own
+paywalls, analytics, entitlement state, and experimentation should usually start
+with the native-store adapter instead.
 
 ```tsx
 import {
@@ -261,25 +338,70 @@ RevenueCat package matching uses the ONBORN package/product data returned by the
 
 ### Native Stores
 
-Use `createNativeStoresBillingAdapter` if the host app talks directly to Apple/Google purchases or uses a package such as `react-native-iap`.
+Use `createNativeStoresBillingAdapter` if the host app talks directly to
+Apple/Google purchases or uses a package such as `expo-iap` or
+`react-native-iap`.
+
+Onborn owns paywall rendering, package selection analytics, purchase validation,
+and entitlement records. Your app owns the native store purchase sheet and
+returns product/purchase evidence to Onborn.
 
 ```tsx
 import { createNativeStoresBillingAdapter } from "@onborn/rn-sdk";
 
 const billingAdapter = createNativeStoresBillingAdapter({
   async loadProducts({ storeProductIds }) {
-    return loadProductsFromNativeStore(storeProductIds);
+    const products = await loadProductsFromNativeStore(storeProductIds);
+
+    return products.map((product) => ({
+      storeProductId: product.id,
+      title: product.title,
+      description: product.description,
+      price: product.displayPrice,
+      currency: product.currency,
+      raw: product,
+    }));
   },
   async purchaseProduct({ storeProductId }) {
-    return purchaseFromNativeStore(storeProductId);
+    const purchase = await purchaseFromNativeStore(storeProductId);
+
+    return {
+      storeProductId,
+      transactionId: purchase.transactionId,
+      purchaseToken: purchase.purchaseToken,
+      raw: purchase,
+    };
   },
   async restorePurchases() {
-    return restoreFromNativeStore();
+    const purchases = await restoreFromNativeStore();
+
+    return {
+      purchases: purchases.map((purchase) => ({
+        store: purchase.platform === "ios" ? "app_store" : "google_play",
+        storeProductId: purchase.productId,
+        transactionId: purchase.transactionId,
+        purchaseToken: purchase.purchaseToken,
+        raw: purchase,
+      })),
+      raw: purchases,
+    };
   },
 });
 ```
 
-ONBORN validates purchase/restore results with the backend. The host app should pass store identifiers, transaction identifiers, purchase tokens, or receipts where available.
+ONBORN validates purchase/restore results with the backend. The host app should
+pass store identifiers, transaction identifiers, purchase tokens, receipts, and
+restored purchases where available.
+
+Production checklist:
+
+- create products in App Store Connect and Google Play Console,
+- connect store product ids to packages in Onborn Billing,
+- pass the same stable `userId` to the SDK, billing adapter, and your backend,
+- return localized price metadata from `loadProducts`,
+- test purchase, trial, cancel, failure, restore, entitlement callbacks, server
+  entitlement checks, and webhooks in the test environment before promoting to
+  prod.
 
 ## Billing Callbacks
 
@@ -445,10 +567,3 @@ Check:
 - step type is `native_custom`,
 - `native.rendererKey` matches `customStepRenderers`,
 - `onCustomStepMissing` logs missing keys.
-
-## Release Notes
-
-Before public release, see:
-
-
-That file tracks package blockers, release checklist, test matrix, and beta scope.

@@ -19,18 +19,122 @@ export function Onboarding() {
 }
 ```
 
-## Install
+## Install package
+
+Yarn:
 
 ```sh
 yarn add @onborn/rn-sdk
-yarn add react-native-safe-area-context react-native-svg react-native-reanimated react-native-worklets
-yarn add expo-font expo-image expo-linear-gradient expo-localization expo-store-review expo-video
+```
+
+NPM:
+
+```sh
+npm install @onborn/rn-sdk
+```
+
+PNPM:
+
+```sh
+pnpm add @onborn/rn-sdk
+```
+
+The SDK owns the Onborn API URL. Apps provide an SDK API key and runtime
+context, not a backend base URL.
+
+### Expo setup
+
+Yarn:
+
+```sh
+yarn add react-native-reanimated react-native-worklets
+```
+
+NPM:
+
+```sh
+npm install react-native-reanimated react-native-worklets
+```
+
+PNPM:
+
+```sh
+pnpm add react-native-reanimated react-native-worklets
+```
+
+Add the Reanimated babel plugin and keep it last:
+
+```js
+module.exports = {
+  presets: ["babel-preset-expo"],
+  plugins: ["react-native-reanimated/plugin"],
+};
 ```
 
 Optional:
 
+Yarn:
+
 ```sh
 yarn add lottie-react-native
+```
+
+NPM:
+
+```sh
+npm install lottie-react-native
+```
+
+PNPM:
+
+```sh
+pnpm add lottie-react-native
+```
+
+Use `lottie-react-native` only if your flows include animated assets.
+
+The SDK bundles `react-native-safe-area-context`, `react-native-svg`, `expo-font`,
+`expo-image`, `expo-linear-gradient`, `expo-localization`, `expo-store-review`,
+`expo-video`, Tamagui, and supported font packages. Install them directly only
+if your app uses them outside Onborn.
+
+Use an Expo development build. Expo Go is not supported for a real Onborn
+integration because Reanimated, Worklets, optional Lottie, and native billing
+modules must be included in your app binary.
+
+### Bare React Native setup
+
+Bare React Native apps must support Expo Modules because the SDK uses Expo
+packages internally for images, fonts, gradients, localization, store review,
+and video primitives.
+
+```sh
+yarn add react-native-reanimated react-native-worklets
+npx pod-install
+```
+
+NPM:
+
+```sh
+npm install react-native-reanimated react-native-worklets
+npx pod-install
+```
+
+PNPM:
+
+```sh
+pnpm add react-native-reanimated react-native-worklets
+pnpm exec pod-install
+```
+
+```js
+module.exports = {
+  presets: ["module:@react-native/babel-preset"],
+  plugins: [
+    // Must stay last.
+    "react-native-reanimated/plugin",
+  ],
+};
 ```
 
 ## Standalone Paywall
@@ -47,14 +151,23 @@ import { SubscriptionPaywall } from "@onborn/rn-sdk";
 
 ## Billing
 
-ONBORN renders the paywall UI. The host app provides billing.
+ONBORN renders the paywall UI, tracks purchase intent, validates purchases, and
+stores entitlements. The host app provides the native purchase prompt through a
+billing adapter.
 
 ```tsx
-import { createRevenueCatBillingAdapter } from "@onborn/rn-sdk";
-import Purchases from "react-native-purchases";
+import { createNativeStoresBillingAdapter } from "@onborn/rn-sdk";
 
-const billingAdapter = createRevenueCatBillingAdapter({
-  purchases: Purchases,
+const billingAdapter = createNativeStoresBillingAdapter({
+  async loadProducts({ storeProductIds }) {
+    return getStoreProducts(storeProductIds);
+  },
+  async purchaseProduct({ storeProductId }) {
+    return purchaseStoreProduct(storeProductId);
+  },
+  async restorePurchases() {
+    return getAvailableStorePurchases();
+  },
 });
 
 <SubscriptionFlow
@@ -63,6 +176,9 @@ const billingAdapter = createRevenueCatBillingAdapter({
   billingAdapter={billingAdapter}
 />;
 ```
+
+Use the RevenueCat adapter only when you already use RevenueCat or are migrating
+gradually from it.
 
 For local demos, use:
 
