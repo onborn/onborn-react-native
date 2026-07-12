@@ -59,7 +59,9 @@ const CustomPrimitiveEntrySchema = z.union([
   TogglePrimitiveSchema,
 ]);
 
-export const CustomPrimitivesSchema = z
+export const CustomPrimitivesSchema: z.ZodType<
+  Record<string, z.infer<typeof CustomPrimitiveEntrySchema>>
+> = z
   .object({
     image: ImagePrimitiveSchema.optional(),
     animated_asset: AnimatedAssetPrimitiveSchema.optional(),

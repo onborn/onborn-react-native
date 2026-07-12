@@ -31,6 +31,7 @@ export function CTAButton(props: {
   fontFamily?: OnbornFontFamily;
   fontWeight?: OnbornFontWeight;
   fontSize?: number;
+  letterSpacing?: number;
   iconName?: PhosphorIconName;
   iconPosition?: CTAButtonIconPosition;
   iconColor?: string;
@@ -66,6 +67,7 @@ export function CTAButton(props: {
       <Text
         color={fg}
         fontSize={fontSize}
+        letterSpacing={props.letterSpacing}
         {...resolveTextFontStyle({
           fontFamily: props.fontFamily,
           fontWeight: props.fontWeight ?? "600",

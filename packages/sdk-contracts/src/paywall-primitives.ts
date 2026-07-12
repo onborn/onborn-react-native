@@ -434,14 +434,33 @@ function readComponentBgProp(
     return undefined;
   }
   const record = value as Record<string, unknown>;
-  if (
-    record.type === "linear_gradient" &&
-    typeof record.preset === "string" &&
-    record.preset.length > 0
-  ) {
+  if (record.type === "linear_gradient") {
+    const stops = Array.isArray(record.stops)
+      ? record.stops
+          .filter(
+            (stop): stop is { color: string; position?: number } =>
+              !!stop &&
+              typeof stop === "object" &&
+              !Array.isArray(stop) &&
+              typeof (stop as Record<string, unknown>).color === "string",
+          )
+          .slice(0, 4)
+      : undefined;
     return {
       type: "linear_gradient",
-      preset: record.preset,
+      ...(typeof record.preset === "string" && record.preset.length > 0
+        ? { preset: record.preset }
+        : {}),
+      ...(typeof record.angle === "number" ? { angle: record.angle } : {}),
+      ...(stops && stops.length >= 2 ? { stops } : {}),
+    };
+  }
+  if (record.type === "blur") {
+    return {
+      type: "blur",
+      ...(typeof record.intensity === "number" ? { intensity: record.intensity } : {}),
+      ...(typeof record.tintColor === "string" ? { tintColor: record.tintColor } : {}),
+      ...(typeof record.opacity === "number" ? { opacity: record.opacity } : {}),
     };
   }
   return undefined;

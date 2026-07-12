@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PHOSPHOR_ICON_NAMES } from "./phosphor-icons";
 
 export const SlotSchema = z.enum(["top", "hero", "content", "bottom"]);
 
@@ -9,12 +10,32 @@ export const PrimitiveVisibilitySchema = z
   })
   .strict();
 
+/** A single gradient color stop; `position` is 0..1 along the gradient line. */
+export const ComponentGradientStopSchema = z
+  .object({
+    color: z.string().trim().min(1),
+    position: z.number().min(0).max(1).optional(),
+  })
+  .strict();
+
 export const ComponentBgSchema = z.union([
   z.string(),
   z
     .object({
       type: z.literal("linear_gradient"),
-      preset: z.string().trim().min(1),
+      // A named preset (backward compatible) OR a custom gradient (angle + 2–4
+      // stops). At least one of `preset`/`stops` should be present.
+      preset: z.string().trim().min(1).optional(),
+      angle: z.number().min(0).max(360).optional(),
+      stops: z.array(ComponentGradientStopSchema).min(2).max(4).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("blur"),
+      intensity: z.number().min(0).max(80).optional(),
+      tintColor: z.string().trim().min(1).optional(),
+      opacity: z.number().min(0).max(1).optional(),
     })
     .strict(),
 ]);
@@ -44,6 +65,12 @@ export const ImagePrimitiveSchema = PrimitiveBaseSchema.extend({
       heightMode: z.enum(["fixed", "aspect"]).optional(),
       aspectRatio: z.number().min(0.2).max(5).optional(),
       resizeMode: z.enum(["cover", "contain"]).optional(),
+      treatment: z.enum(["none", "dim", "soft", "cinematic"]).optional(),
+      focalPointX: z.number().min(0).max(1).optional(),
+      focalPointY: z.number().min(0).max(1).optional(),
+      overlayColor: z.string().trim().min(1).optional(),
+      overlayOpacity: z.number().min(0).max(1).optional(),
+      blurRadius: z.number().min(0).max(40).optional(),
     })
     .strict(),
 });
@@ -102,33 +129,12 @@ export const TextFontWeightSchema = z.enum([
 ]);
 
 export const TextLineHeightSchema = z.enum(["tight", "normal", "relaxed"]);
+export const TextLetterSpacingSchema = z.number().min(-4).max(16);
+export const TextFontSizeSchema = z.number().min(8).max(120);
 
 export const TitleFontWeightSchema = TextFontWeightSchema;
 
-export const PhosphorIconNameSchema = z.enum([
-  "arrow-left",
-  "arrow-right",
-  "bell",
-  "calendar",
-  "caret-left",
-  "check",
-  "check-circle",
-  "crown",
-  "fire",
-  "gift",
-  "heart",
-  "lightning",
-  "lock",
-  "magic-wand",
-  "rocket",
-  "shield-check",
-  "sparkle",
-  "star",
-  "target",
-  "trophy",
-  "user",
-  "x",
-]);
+export const PhosphorIconNameSchema = z.enum(PHOSPHOR_ICON_NAMES);
 
 export const PhosphorIconWeightSchema = z.enum([
   "thin",
@@ -144,12 +150,14 @@ export const TitlePrimitiveSchema = PrimitiveBaseSchema.extend({
   props: z
     .object({
       text: z.string(),
-      size: z.enum(["sm", "md", "lg", "xl"]).optional(),
+      size: z.enum(["sm", "md", "lg", "xl", "display", "hero"]).optional(),
       align: z.enum(["left", "center", "right"]).optional(),
       color: z.string().optional(),
       fontFamily: TextFontFamilySchema.optional(),
       fontWeight: TitleFontWeightSchema.optional(),
+      fontSize: TextFontSizeSchema.optional(),
       lineHeight: TextLineHeightSchema.optional(),
+      letterSpacing: TextLetterSpacingSchema.optional(),
     })
     .strict(),
 });
@@ -159,12 +167,14 @@ export const SubtitlePrimitiveSchema = PrimitiveBaseSchema.extend({
   props: z
     .object({
       text: z.string(),
-      size: z.enum(["sm", "md"]).optional(),
+      size: z.enum(["sm", "md", "lg"]).optional(),
       align: z.enum(["left", "center"]).optional(),
       color: z.string().optional(),
       fontFamily: TextFontFamilySchema.optional(),
       fontWeight: TextFontWeightSchema.optional(),
+      fontSize: TextFontSizeSchema.optional(),
       lineHeight: TextLineHeightSchema.optional(),
+      letterSpacing: TextLetterSpacingSchema.optional(),
     })
     .strict(),
 });
@@ -218,6 +228,8 @@ export const CTAButtonPrimitiveSchema = PrimitiveBaseSchema.extend({
       borderRadius: z.number().min(0).max(999).optional(),
       fontFamily: TextFontFamilySchema.optional(),
       fontWeight: TextFontWeightSchema.optional(),
+      fontSize: z.number().min(8).max(64).optional(),
+      letterSpacing: TextLetterSpacingSchema.optional(),
       iconName: PhosphorIconNameSchema.optional(),
       iconPosition: CTAButtonIconPositionSchema.optional(),
       iconColor: z.string().optional(),
@@ -427,6 +439,22 @@ export const IconPrimitiveSchema = PrimitiveBaseSchema.extend({
     .strict(),
 });
 
+const STACK_MAX_CHILDREN = 6;
+const STACK_MAX_CENTER_CHILD_INDEX = STACK_MAX_CHILDREN - 1;
+
+function isEmbeddedStackPrimitive(value: unknown): value is {
+  type?: unknown;
+  props?: { children?: unknown };
+} {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    ((value as { type?: unknown }).type === "x_stack" ||
+      (value as { type?: unknown }).type === "y_stack")
+  );
+}
+
 const EmbeddedPrimitiveSchema: z.ZodType<{
   type: string;
   visible?: boolean;
@@ -447,30 +475,53 @@ const EmbeddedPrimitiveSchema: z.ZodType<{
       if (!Array.isArray(children)) {
         return;
       }
-      if (children.length > 4) {
+      if (children.length > STACK_MAX_CHILDREN) {
         ctx.addIssue({
           code: z.ZodIssueCode.too_big,
-          maximum: 4,
+          maximum: STACK_MAX_CHILDREN,
           type: "array",
           inclusive: true,
           path: ["props", "children"],
-          message: "Nested stacks can contain at most 4 children",
+          message: `Nested stacks can contain at most ${STACK_MAX_CHILDREN} children`,
         });
       }
       children.forEach((child, index) => {
-        if (
-          child &&
-          typeof child === "object" &&
-          !Array.isArray(child) &&
-          ((child as { type?: unknown }).type === "x_stack" ||
-            (child as { type?: unknown }).type === "y_stack")
-        ) {
+        if (!isEmbeddedStackPrimitive(child)) {
+          return;
+        }
+        const grandChildren = child.props?.children;
+        if (!Array.isArray(grandChildren)) {
+          return;
+        }
+        if (grandChildren.length > STACK_MAX_CHILDREN) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["props", "children", index, "type"],
-            message: "Nested stacks cannot contain another x_stack/y_stack",
+            code: z.ZodIssueCode.too_big,
+            maximum: STACK_MAX_CHILDREN,
+            type: "array",
+            inclusive: true,
+            path: ["props", "children", index, "props", "children"],
+            message: `Nested stacks can contain at most ${STACK_MAX_CHILDREN} children`,
           });
         }
+        grandChildren.forEach((grandChild, grandChildIndex) => {
+          if (!isEmbeddedStackPrimitive(grandChild)) {
+            return;
+          }
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [
+              "props",
+              "children",
+              index,
+              "props",
+              "children",
+              grandChildIndex,
+              "type",
+            ],
+            message:
+              "Stacks can nest up to 2 levels; nested stacks cannot contain another x_stack/y_stack",
+          });
+        });
       });
     }),
 );
@@ -504,10 +555,14 @@ const StackSurfacePropsSchema = z
     borderWidth: z.number().min(0).max(12).optional(),
     alignItems: StackAlignItemsSchema.optional(),
     justifyContent: StackJustifyContentSchema.optional(),
-    centerChildIndex: z.number().int().min(0).max(3).optional(),
+    centerChildIndex: z.number().int().min(0).max(STACK_MAX_CENTER_CHILD_INDEX).optional(),
+    layout: z.enum(["stack", "grid"]).optional(),
+    columns: z.number().int().min(2).max(4).optional(),
+    rowGap: z.number().min(0).max(64).optional(),
+    columnGap: z.number().min(0).max(64).optional(),
     overlay: z.boolean().optional(),
     overlayPlacement: z.enum(["top", "bottom"]).optional(),
-    children: z.array(EmbeddedPrimitiveSchema).max(4).optional(),
+    children: z.array(EmbeddedPrimitiveSchema).max(STACK_MAX_CHILDREN).optional(),
   })
   .strict();
 
@@ -638,26 +693,6 @@ export const TestimonialCardPrimitiveSchema = PrimitiveBaseSchema.extend({
     .strict(),
 });
 
-export const PackagesPrimitiveSchema = PrimitiveBaseSchema.extend({
-  type: z.literal("packages"),
-  props: z
-    .object({
-      plans: z.array(
-        z
-          .object({
-            id: z.string(),
-            title: z.string(),
-            price: z.string(),
-            period: z.string(),
-            features: z.array(z.string()),
-          })
-          .strict(),
-      ),
-      selectedId: z.string().optional(),
-    })
-    .strict(),
-});
-
 export const LoadingPrimitiveSchema = PrimitiveBaseSchema.extend({
   type: z.literal("loading"),
   props: z
@@ -672,16 +707,6 @@ export const LoadingPrimitiveSchema = PrimitiveBaseSchema.extend({
       fontFamily: TextFontFamilySchema.optional(),
       fontWeight: TextFontWeightSchema.optional(),
       lineHeight: TextLineHeightSchema.optional(),
-    })
-    .strict(),
-});
-
-export const SheetPrimitiveSchema = PrimitiveBaseSchema.extend({
-  type: z.literal("sheet"),
-  props: z
-    .object({
-      title: z.string().optional(),
-      content: z.string().optional(),
     })
     .strict(),
 });

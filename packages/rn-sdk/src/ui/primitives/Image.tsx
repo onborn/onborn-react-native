@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import type { ImageStyle, StyleProp } from "react-native";
+import { StyleSheet, View } from "react-native";
+import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { createAssetCacheKey } from "../assets/cache";
 import { useResponsiveScale } from "../responsive";
@@ -15,7 +16,13 @@ export function ImagePrimitive(props: {
   heightMode?: "fixed" | "aspect";
   aspectRatio?: number;
   resizeMode?: "cover" | "contain";
-  style?: StyleProp<ImageStyle>;
+  treatment?: "none" | "dim" | "soft" | "cinematic";
+  focalPointX?: number;
+  focalPointY?: number;
+  overlayColor?: string;
+  overlayOpacity?: number;
+  blurRadius?: number;
+  style?: StyleProp<ImageStyle | ViewStyle>;
 }) {
   const { scaleImage, scaleRadius } = useResponsiveScale();
   const source = useMemo(
@@ -42,12 +49,18 @@ export function ImagePrimitive(props: {
     typeof props.aspectRatio === "number" &&
     props.aspectRatio > 0;
 
+  const overlayOpacity =
+    typeof props.overlayOpacity === "number"
+      ? Math.min(1, Math.max(0, props.overlayOpacity))
+      : props.treatment === "dim"
+        ? 0.22
+        : props.treatment === "cinematic"
+          ? 0.14
+          : 0;
+  const overlayColor = props.overlayColor ?? "#000000";
+
   return (
-    <ExpoImage
-      source={source}
-      cachePolicy="memory-disk"
-      contentFit={props.resizeMode ?? "cover"}
-      transition={160}
+    <View
       style={[
         {
           width:
@@ -68,9 +81,30 @@ export function ImagePrimitive(props: {
             typeof props.borderRadius === "number"
               ? scaleRadius(props.borderRadius)
               : 0,
+          overflow: "hidden",
         },
         props.style,
       ]}
-    />
+    >
+      <ExpoImage
+        source={source}
+        cachePolicy="memory-disk"
+        contentFit={props.resizeMode ?? "cover"}
+        transition={160}
+        style={StyleSheet.absoluteFill}
+      />
+      {overlayOpacity > 0 ? (
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: overlayColor,
+              opacity: overlayOpacity,
+            },
+          ]}
+        />
+      ) : null}
+    </View>
   );
 }

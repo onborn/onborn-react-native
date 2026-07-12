@@ -73,6 +73,7 @@
     "@tamagui/config": "^2.0.0-rc.42",
     "@tamagui/core": "^2.0.0-rc.42",
     "expo-font": "~14.0.11",
+    "expo-blur": "~15.0.8",
     "expo-image": "~3.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-localization": "~17.0.8",

@@ -62,9 +62,20 @@ export type LayoutBgSolid = {
   color: string;
 };
 
+export type LayoutBgGradientStop = {
+  color: string;
+  /** 0..1 position along the gradient line. */
+  position?: number;
+};
+
 export type LayoutBgLinearGradient = {
   type: "linear_gradient";
-  preset: LayoutBgGradientPreset;
+  /** Named preset (backward compatible). */
+  preset?: LayoutBgGradientPreset;
+  /** Custom gradient angle in degrees (CSS convention, 0 = to top). */
+  angle?: number;
+  /** Custom gradient stops (2–4). Wins over `preset` when present. */
+  stops?: LayoutBgGradientStop[];
 };
 
 export type LayoutBgImage = {

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
+  TextFontSizeSchema,
   TextFontFamilySchema,
+  TextLetterSpacingSchema,
   TextLineHeightSchema,
   TextFontWeightSchema,
 } from "./primitives";
@@ -26,6 +28,12 @@ export const FlowThemeFontsSchema = z
     headline: TextFontFamilySchema.optional(),
     body: TextFontFamilySchema.optional(),
     label: TextFontFamilySchema.optional(),
+    headlineSize: TextFontSizeSchema.optional(),
+    bodySize: TextFontSizeSchema.optional(),
+    labelSize: z.number().min(8).max(64).optional(),
+    headlineLetterSpacing: TextLetterSpacingSchema.optional(),
+    bodyLetterSpacing: TextLetterSpacingSchema.optional(),
+    labelLetterSpacing: TextLetterSpacingSchema.optional(),
   })
   .strict();
 
@@ -39,6 +47,7 @@ export const FlowThemeButtonStyleSchema = z
     fontFamily: TextFontFamilySchema.optional(),
     fontWeight: TextFontWeightSchema.optional(),
     fontSize: z.number().min(8).max(64).optional(),
+    letterSpacing: TextLetterSpacingSchema.optional(),
   })
   .strict();
 
@@ -142,6 +151,7 @@ const CTA_THEME_STYLE_PROP_KEYS = [
   "fontFamily",
   "fontWeight",
   "fontSize",
+  "letterSpacing",
   "iconColor",
 ] as const;
 

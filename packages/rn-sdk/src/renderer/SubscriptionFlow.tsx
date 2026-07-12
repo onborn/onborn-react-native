@@ -1,5 +1,5 @@
 import {
-  LAYOUT_BG_GRADIENT_PRESETS,
+  resolveGradientSolidColor,
   type CTAButtonAction,
   type FlowConfig,
   type FlowTheme,
@@ -2611,10 +2611,7 @@ function resolveRootBackgroundColor(bg: LayoutBg | undefined): string {
     return bg.color;
   }
   if (bg?.type === "linear_gradient") {
-    return (
-      LAYOUT_BG_GRADIENT_PRESETS[bg.preset]?.colors[1] ??
-      "#000000"
-    );
+    return resolveGradientSolidColor(bg, "#000000");
   }
   return "#000000";
 }

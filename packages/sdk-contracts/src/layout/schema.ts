@@ -10,6 +10,14 @@ export const LayoutBgGradientPresetSchema = z.enum(
   LAYOUT_BG_GRADIENT_PRESET_VALUES,
 );
 
+/** A single gradient color stop; `position` is 0..1 along the gradient line. */
+export const GradientStopSchema = z
+  .object({
+    color: z.string().trim().min(1),
+    position: z.number().min(0).max(1).optional(),
+  })
+  .strict();
+
 export const LayoutBgSchema = z.discriminatedUnion("type", [
   z
     .object({
@@ -20,7 +28,12 @@ export const LayoutBgSchema = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("linear_gradient"),
-      preset: LayoutBgGradientPresetSchema,
+      // A named preset (backward compatible) OR a custom gradient defined by an
+      // angle + 2–4 stops. At least one of `preset`/`stops` should be present;
+      // renderers fall back gracefully if neither is.
+      preset: LayoutBgGradientPresetSchema.optional(),
+      angle: z.number().min(0).max(360).optional(),
+      stops: z.array(GradientStopSchema).min(2).max(4).optional(),
     })
     .strict(),
   z

@@ -1,6 +1,7 @@
 export type {
   LayoutBg,
   LayoutBgGradientPreset,
+  LayoutBgGradientStop,
   LayoutConfig,
   LayoutPreset,
 } from "./types";
@@ -14,8 +15,19 @@ export {
   type LayoutSlot,
 } from "./types";
 export {
+  GradientStopSchema,
   LayoutBgGradientPresetSchema,
   LayoutBgSchema,
   LayoutConfigSchema,
   LayoutPresetSchema,
 } from "./schema";
+export {
+  DEFAULT_GRADIENT_ANGLE,
+  gradientAngleToStartEnd,
+  isLayoutGradientPreset,
+  resolveGradient,
+  resolveGradientSolidColor,
+  type GradientBgLike,
+  type GradientStop,
+  type ResolvedGradient,
+} from "./gradient";

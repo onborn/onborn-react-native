@@ -11,15 +11,19 @@ import { useResponsiveScale } from "../responsive";
 
 export function Subtitle(props: {
   text: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   align?: "left" | "center";
   color?: string;
   fontFamily?: OnbornFontFamily;
   fontWeight?: OnbornFontWeight;
+  fontSize?: number;
   lineHeight?: OnbornLineHeight;
+  letterSpacing?: number;
 }) {
   const { scaleFont } = useResponsiveScale();
-  const fontSize = scaleFont(props.size === "sm" ? 14 : 16);
+  const fontSize = scaleFont(
+    props.fontSize ?? (props.size === "sm" ? 14 : props.size === "lg" ? 18 : 16),
+  );
   return (
     <YStack
       width="100%"
@@ -28,6 +32,7 @@ export function Subtitle(props: {
       <Text
         fontSize={fontSize}
         lineHeight={resolveTextLineHeight(fontSize, props.lineHeight)}
+        letterSpacing={props.letterSpacing}
         color={props.color ?? "#9CA5B3"}
         textAlign={props.align === "left" ? "left" : "center"}
         {...resolveTextFontStyle({

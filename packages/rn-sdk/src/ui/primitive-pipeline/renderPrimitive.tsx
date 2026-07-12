@@ -1,6 +1,5 @@
 import React from "react";
 import { XStack, YStack } from "tamagui";
-import { Packages } from "../primitives/placeholders";
 import {
   AgePicker,
   AnimatedAsset,
@@ -71,6 +70,10 @@ type StackPrimitiveProps = {
     | "space-between"
     | "space-around";
   centerChildIndex?: number;
+  layout?: "stack" | "grid";
+  columns?: number;
+  rowGap?: number;
+  columnGap?: number;
   overlay?: boolean;
   overlayPlacement?: "top" | "bottom";
   children?: EmbeddedPrimitive[];
@@ -217,6 +220,64 @@ function renderEmbeddedChildren(
     out.push(renderedNode);
   });
   return out;
+}
+
+function renderEmbeddedGridChildren(
+  children: EmbeddedPrimitive[] | undefined,
+  options: PrimitiveRenderOptions | undefined,
+  parentId: string | undefined,
+  parentVisibility: PrimitiveInstance["visibility"] | undefined,
+  columns: number,
+  rowGap = 0,
+  columnGap = 0,
+): React.ReactNode[] {
+  if (!Array.isArray(children)) {
+    return [];
+  }
+
+  const validChildren = children.filter(
+    (child) =>
+      child &&
+      child.visible !== false &&
+      typeof child.type === "string" &&
+      child.props &&
+      typeof child.props === "object" &&
+      !Array.isArray(child.props),
+  );
+  const rows: EmbeddedPrimitive[][] = [];
+  for (let index = 0; index < validChildren.length; index += columns) {
+    rows.push(validChildren.slice(index, index + columns));
+  }
+
+  return rows.map((row, rowIndex) => (
+    <XStack
+      key={`grid-row-${rowIndex}`}
+      width="100%"
+      gap={columnGap}
+      alignItems="stretch"
+    >
+      {row.map((child, cellIndex) => {
+        const originalIndex = rowIndex * columns + cellIndex;
+        const nodes = renderEmbeddedChildren(
+          [child],
+          options,
+          "y",
+          parentId ? `${parentId}::grid::${originalIndex}` : undefined,
+          parentVisibility,
+        );
+        return (
+          <YStack
+            key={`${child.type}-${originalIndex}`}
+            flex={1}
+            minWidth={0}
+            marginBottom={rowIndex < rows.length - 1 ? rowGap : 0}
+          >
+            {nodes}
+          </YStack>
+        );
+      })}
+    </XStack>
+  ));
 }
 
 function readPrimitiveValueId(
@@ -377,7 +438,13 @@ export function renderPrimitive(
     return trimmed.length > 0 ? trimmed : undefined;
   };
   const withThemeFont = <
-    TProps extends { fontFamily?: unknown; color?: unknown },
+    TProps extends {
+      fontFamily?: unknown;
+      color?: unknown;
+      fontSize?: unknown;
+      letterSpacing?: unknown;
+      size?: unknown;
+    },
   >(
     primitiveProps: TProps,
     role: "headline" | "body" | "label",
@@ -393,6 +460,24 @@ export function renderPrimitive(
       resolvePrimitiveFontFamily(primitiveProps.fontFamily) ??
       flowTheme.fonts[role] ??
       options?.layoutFontFamily,
+    fontSize:
+      typeof primitiveProps.fontSize === "number"
+        ? primitiveProps.fontSize
+        : typeof primitiveProps.size === "string"
+          ? undefined
+          : role === "headline"
+            ? flowTheme.fonts.headlineSize
+            : role === "body"
+              ? flowTheme.fonts.bodySize
+              : flowTheme.fonts.labelSize,
+    letterSpacing:
+      typeof primitiveProps.letterSpacing === "number"
+        ? primitiveProps.letterSpacing
+        : role === "headline"
+          ? flowTheme.fonts.headlineLetterSpacing
+          : role === "body"
+            ? flowTheme.fonts.bodyLetterSpacing
+            : flowTheme.fonts.labelLetterSpacing,
   });
 
   switch (p.type) {
@@ -459,9 +544,9 @@ export function renderPrimitive(
           return resolveColor(value);
         }
         if (usesThemeButtonStyles) {
-          return themeValue;
+          return resolveColor(themeValue) ?? themeValue;
         }
-        return resolveColor(value) ?? themeValue;
+        return resolveColor(value) ?? resolveColor(themeValue) ?? themeValue;
       };
       const pickThemeLinkedNumber = (
         value: number | undefined,
@@ -495,6 +580,10 @@ export function renderPrimitive(
             fontSize: pickThemeLinkedNumber(
               cta.fontSize,
               themeButton?.fontSize,
+            ),
+            letterSpacing: pickThemeLinkedNumber(
+              cta.letterSpacing,
+              themeButton?.letterSpacing ?? flowTheme.fonts.labelLetterSpacing,
             ),
             iconColor: pickThemeLinkedColor(
               cta.iconColor,
@@ -617,8 +706,11 @@ export function renderPrimitive(
     }
     case "x_stack": {
       const stackProps = props as StackPrimitiveProps;
+      const isGrid = stackProps.layout === "grid";
+      const gridColumns = Math.min(Math.max(stackProps.columns ?? 2, 2), 4);
+      const StackComponent = isGrid ? YStack : XStack;
       return (
-        <XStack
+        <StackComponent
           width="100%"
           position="relative"
           overflow="hidden"
@@ -642,7 +734,7 @@ export function renderPrimitive(
               : undefined
           }
           gap={
-            typeof stackProps.gap === "number"
+            !isGrid && typeof stackProps.gap === "number"
               ? scaleSpace(stackProps.gap)
               : undefined
           }
@@ -659,19 +751,31 @@ export function renderPrimitive(
                 : 0
             }
           />
-          {renderEmbeddedChildren(
-            stackProps.children,
-            options,
-            "x",
-            p.id,
-            p.visibility,
-            stackProps.centerChildIndex,
-          )}
-        </XStack>
+          {isGrid
+            ? renderEmbeddedGridChildren(
+                stackProps.children,
+                options,
+                p.id,
+                p.visibility,
+                gridColumns,
+                scaleSpace(stackProps.rowGap ?? stackProps.gap ?? 0),
+                scaleSpace(stackProps.columnGap ?? stackProps.gap ?? 0),
+              )
+            : renderEmbeddedChildren(
+                stackProps.children,
+                options,
+                "x",
+                p.id,
+                p.visibility,
+                stackProps.centerChildIndex,
+              )}
+        </StackComponent>
       );
     }
     case "y_stack": {
       const stackProps = props as StackPrimitiveProps;
+      const isGrid = stackProps.layout === "grid";
+      const gridColumns = Math.min(Math.max(stackProps.columns ?? 2, 2), 4);
       return (
         <YStack
           width="100%"
@@ -697,7 +801,7 @@ export function renderPrimitive(
               : undefined
           }
           gap={
-            typeof stackProps.gap === "number"
+            !isGrid && typeof stackProps.gap === "number"
               ? scaleSpace(stackProps.gap)
               : undefined
           }
@@ -714,13 +818,23 @@ export function renderPrimitive(
                 : 0
             }
           />
-          {renderEmbeddedChildren(
-            stackProps.children,
-            options,
-            "y",
-            p.id,
-            p.visibility,
-          )}
+          {isGrid
+            ? renderEmbeddedGridChildren(
+                stackProps.children,
+                options,
+                p.id,
+                p.visibility,
+                gridColumns,
+                scaleSpace(stackProps.rowGap ?? stackProps.gap ?? 0),
+                scaleSpace(stackProps.columnGap ?? stackProps.gap ?? 0),
+              )
+            : renderEmbeddedChildren(
+                stackProps.children,
+                options,
+                "y",
+                p.id,
+                p.visibility,
+              )}
         </YStack>
       );
     }
@@ -1076,8 +1190,6 @@ export function renderPrimitive(
       }
       return null;
     }
-    case "packages":
-      return <Packages {...props} />;
     case "loading":
       return (
         <Loading

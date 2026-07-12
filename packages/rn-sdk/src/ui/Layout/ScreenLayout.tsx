@@ -1,6 +1,7 @@
 import type { LayoutPresetConfig } from "../../config/layout";
 import {
-  LAYOUT_BG_GRADIENT_PRESETS,
+  gradientAngleToStartEnd,
+  resolveGradient,
   type LayoutBg,
   type LayoutSlot,
 } from "@onborn/sdk-contracts";
@@ -430,11 +431,14 @@ export function ScreenLayout({
     );
 
   if (bg?.type === "linear_gradient") {
+    const { colors, locations, angle } = resolveGradient(bg);
+    const { start, end } = gradientAngleToStartEnd(angle);
     return (
       <LinearGradient
-        colors={[...(LAYOUT_BG_GRADIENT_PRESETS[bg.preset]?.colors ?? ["#0E1116", "#000000"])]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={colors as [string, string, ...string[]]}
+        locations={locations as [number, number, ...number[]] | undefined}
+        start={start}
+        end={end}
         style={{ flex: 1 }}
       >
         {keyboardAwareContentNode}

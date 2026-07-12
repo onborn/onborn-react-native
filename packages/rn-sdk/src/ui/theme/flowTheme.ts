@@ -15,6 +15,12 @@ export const DEFAULT_FLOW_THEME: Required<FlowTheme> = {
     headline: "Inter",
     body: "Inter",
     label: "Inter",
+    headlineSize: 26,
+    bodySize: 16,
+    labelSize: 16,
+    headlineLetterSpacing: 0,
+    bodyLetterSpacing: 0,
+    labelLetterSpacing: 0,
   },
   buttons: {
     primary: {
@@ -24,6 +30,7 @@ export const DEFAULT_FLOW_THEME: Required<FlowTheme> = {
       fontFamily: "Inter",
       fontWeight: "600",
       fontSize: 16,
+      letterSpacing: 0,
     },
     secondary: {
       bg: "#171B22",
@@ -34,6 +41,7 @@ export const DEFAULT_FLOW_THEME: Required<FlowTheme> = {
       fontFamily: "Inter",
       fontWeight: "600",
       fontSize: 16,
+      letterSpacing: 0,
     },
     inverted: {
       bg: "#F3F5F8",
@@ -42,6 +50,7 @@ export const DEFAULT_FLOW_THEME: Required<FlowTheme> = {
       fontFamily: "Inter",
       fontWeight: "600",
       fontSize: 16,
+      letterSpacing: 0,
     },
     outline: {
       bg: "transparent",
@@ -52,6 +61,7 @@ export const DEFAULT_FLOW_THEME: Required<FlowTheme> = {
       fontFamily: "Inter",
       fontWeight: "600",
       fontSize: 16,
+      letterSpacing: 0,
     },
   },
   components: {

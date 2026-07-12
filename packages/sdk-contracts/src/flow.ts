@@ -83,6 +83,21 @@ export const StepSchema: z.ZodType<
   SocialProofStepSchema,
 ]);
 
+const FLOW_STACK_MAX_CHILDREN = 6;
+
+function isFlowStackPrimitive(value: unknown): value is {
+  type?: unknown;
+  props?: { children?: unknown };
+} {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    ((value as { type?: unknown }).type === "x_stack" ||
+      (value as { type?: unknown }).type === "y_stack")
+  );
+}
+
 const FlowStackPropsOverrideSchema = z.object({
   children: z
     .array(
@@ -102,35 +117,57 @@ const FlowStackPropsOverrideSchema = z.object({
           if (!Array.isArray(children)) {
             return;
           }
-          if (children.length > 4) {
+          if (children.length > FLOW_STACK_MAX_CHILDREN) {
             ctx.addIssue({
               code: z.ZodIssueCode.too_big,
-              maximum: 4,
+              maximum: FLOW_STACK_MAX_CHILDREN,
               type: "array",
               inclusive: true,
               path: ["props", "children"],
-              message: "Nested flow stacks can contain at most 4 children",
+              message: `Nested flow stacks can contain at most ${FLOW_STACK_MAX_CHILDREN} children`,
             });
           }
           children.forEach((child, index) => {
-            if (
-              child &&
-              typeof child === "object" &&
-              !Array.isArray(child) &&
-              ((child as { type?: unknown }).type === "x_stack" ||
-                (child as { type?: unknown }).type === "y_stack")
-            ) {
+            if (!isFlowStackPrimitive(child)) {
+              return;
+            }
+            const grandChildren = child.props?.children;
+            if (!Array.isArray(grandChildren)) {
+              return;
+            }
+            if (grandChildren.length > FLOW_STACK_MAX_CHILDREN) {
               ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ["props", "children", index, "type"],
-                message:
-                  "Nested flow stacks cannot contain another x_stack/y_stack",
+                code: z.ZodIssueCode.too_big,
+                maximum: FLOW_STACK_MAX_CHILDREN,
+                type: "array",
+                inclusive: true,
+                path: ["props", "children", index, "props", "children"],
+                message: `Nested flow stacks can contain at most ${FLOW_STACK_MAX_CHILDREN} children`,
               });
             }
+            grandChildren.forEach((grandChild, grandChildIndex) => {
+              if (!isFlowStackPrimitive(grandChild)) {
+                return;
+              }
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: [
+                  "props",
+                  "children",
+                  index,
+                  "props",
+                  "children",
+                  grandChildIndex,
+                  "type",
+                ],
+                message:
+                  "Flow stacks can nest up to 2 levels; nested flow stacks cannot contain another x_stack/y_stack",
+              });
+            });
           });
         }),
     )
-    .max(4)
+    .max(FLOW_STACK_MAX_CHILDREN)
     .optional(),
 });
 
