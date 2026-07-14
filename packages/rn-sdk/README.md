@@ -64,6 +64,9 @@ Onborn.init({
 ```
 
 All SDK components and hooks read this runtime configuration.
+The same singleton is provided by `@onborn/analytics`, so apps that start with
+standalone analytics can later add the React Native SDK without introducing a
+second client or configuration path.
 
 ### Expo setup
 

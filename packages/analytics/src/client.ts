@@ -9,7 +9,27 @@ const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_MAX_QUEUE_SIZE = 1000;
 const DEFAULT_ONBORN_API_BASE_URL = "https://api.testing.onborn.app";
 
-export type AnalyticsClientOptions = {
+export type OnbornConfig = {
+  apiKey: string;
+  userId?: string;
+  appId?: string;
+  platform?: AnalyticsPlatform;
+  locale?: string;
+  country?: string;
+  userType?: "new" | "returning";
+  appVersion?: string;
+  sdkVersion?: string;
+  emitAnalyticsEvents?: boolean;
+  emitSdkConnectionSignal?: boolean;
+  autoFlushMs?: number;
+  maxAnalyticsBatchSize?: number;
+  maxAnalyticsQueueSize?: number;
+  analyticsQueueKey?: string;
+  analyticsStorage?: AnalyticsStorage;
+  fetchImpl?: FetchLike;
+};
+
+type AnalyticsClientOptions = {
   apiKey: string;
   appId: string;
   platform: AnalyticsPlatform;
@@ -26,6 +46,12 @@ export type AnalyticsClientOptions = {
   fetchImpl?: FetchLike;
 };
 
+type WithOptionalUserId<T> = T extends { userId: string }
+  ? Omit<T, "userId"> & { userId?: string }
+  : T;
+
+export type OnbornTrackEventInput = WithOptionalUserId<TrackEventInput>;
+
 export type FlushSummary = {
   attempted: number;
   sent: number;
@@ -33,7 +59,7 @@ export type FlushSummary = {
   remaining: number;
 };
 
-export class AnalyticsClient {
+class AnalyticsClient {
   private readonly queue: AnalyticsQueue;
   private readonly endpoint: string;
   private readonly maxBatchSize: number;
@@ -160,10 +186,89 @@ export class AnalyticsClient {
   }
 }
 
-export function createAnalyticsClient(options: AnalyticsClientOptions): AnalyticsClient {
-  return new AnalyticsClient(options);
+let globalOnbornConfig: OnbornConfig | null = null;
+let globalAnalyticsClient: AnalyticsClient | null = null;
+
+export const Onborn = {
+  init(config: OnbornConfig): void {
+    globalAnalyticsClient?.stopAutoFlush();
+    globalOnbornConfig = { ...config };
+    globalAnalyticsClient = new AnalyticsClient({
+      apiKey: config.apiKey,
+      appId: config.appId ?? "onborn.app",
+      platform: config.platform ?? inferPlatform(),
+      locale: config.locale,
+      country: config.country,
+      userType: config.userType,
+      appVersion: config.appVersion ?? "0.0.0",
+      sdkVersion: config.sdkVersion ?? "0.1.0",
+      maxBatchSize: config.maxAnalyticsBatchSize,
+      maxQueueSize: config.maxAnalyticsQueueSize,
+      queueKey: config.analyticsQueueKey,
+      autoFlushMs: config.autoFlushMs,
+      storage: config.analyticsStorage,
+      fetchImpl: config.fetchImpl,
+    });
+    globalAnalyticsClient.startAutoFlush();
+  },
+
+  getConfig(): OnbornConfig | null {
+    return globalOnbornConfig ? { ...globalOnbornConfig } : null;
+  },
+
+  async track(input: OnbornTrackEventInput): Promise<AnalyticsEvent> {
+    const client = requireAnalyticsClient();
+    const config = requireOnbornConfig();
+    const candidate =
+      config.userId && !("userId" in input && input.userId)
+        ? { ...input, userId: config.userId }
+        : input;
+    return client.track(candidate as TrackEventInput);
+  },
+
+  flush(): Promise<FlushSummary> {
+    return requireAnalyticsClient().flush();
+  },
+
+  startAutoFlush(): void {
+    requireAnalyticsClient().startAutoFlush();
+  },
+
+  stopAutoFlush(): void {
+    requireAnalyticsClient().stopAutoFlush();
+  },
+
+  getQueueSize(): Promise<number> {
+    return requireAnalyticsClient().getQueueSize();
+  },
+
+  resetQueue(): Promise<void> {
+    return requireAnalyticsClient().resetQueue();
+  },
+};
+
+function requireOnbornConfig(): OnbornConfig {
+  if (!globalOnbornConfig) {
+    throw new Error(
+      "Onborn is not initialized. Call Onborn.init({ apiKey, ...config }) before using analytics.",
+    );
+  }
+  return globalOnbornConfig;
+}
+
+function requireAnalyticsClient(): AnalyticsClient {
+  if (!globalAnalyticsClient) {
+    requireOnbornConfig();
+    throw new Error("Onborn analytics client is not initialized.");
+  }
+  return globalAnalyticsClient;
 }
 
 function buildEventsEndpoint(baseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/events`;
+}
+
+function inferPlatform(): AnalyticsPlatform {
+  const userAgent = globalThis.navigator?.userAgent?.toLowerCase() ?? "";
+  return userAgent.includes("android") ? "android" : "ios";
 }

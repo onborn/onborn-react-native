@@ -4,23 +4,30 @@
 Use it directly when an app wants to send Onborn analytics events without
 rendering an onboarding flow or paywall through `@onborn/rn-sdk`.
 
+Standalone analytics does not require an Onborn funnel or paywall. Create an
+Onborn project/app, use its SDK API key, and initialize analytics directly.
+Events still require a stable logical `flowId`, such as `app-lifecycle`, to
+group sessions and metrics. That id does not need to reference a funnel created
+in the Onborn builder.
+
 ## Install
 
 ```sh
 yarn add @onborn/analytics
 ```
 
-## Create a client
+## Initialize once
 
 ```ts
-import { createAnalyticsClient } from "@onborn/analytics";
+import { Onborn } from "@onborn/analytics";
 
-const analytics = createAnalyticsClient({
+Onborn.init({
   apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
+  userId: "user-123",
   appId: "ios-app",
   platform: "ios",
   appVersion: "1.0.0",
-  sdkVersion: "0.1.0-beta.0",
+  sdkVersion: "0.1.0-beta.1",
 });
 ```
 
@@ -30,14 +37,13 @@ context, not a backend URL.
 ## Track an event
 
 ```ts
-await analytics.track({
+await Onborn.track({
   type: "flow_started",
-  flowId: "main-onboarding",
+  flowId: "app-lifecycle",
   sessionId: "session-123",
-  userId: "user-123",
 });
 
-await analytics.flush();
+await Onborn.flush();
 ```
 
 ## Queue behavior
@@ -45,15 +51,16 @@ await analytics.flush();
 Events are queued and flushed in batches.
 
 ```ts
-const analytics = createAnalyticsClient({
+Onborn.init({
   apiKey,
+  userId,
   appId: "ios-app",
   platform: "ios",
   appVersion: "1.0.0",
-  sdkVersion: "0.1.0-beta.0",
-  maxBatchSize: 10,
+  sdkVersion: "0.1.0-beta.1",
+  maxAnalyticsBatchSize: 10,
   autoFlushMs: 10_000,
-  maxQueueSize: 500,
+  maxAnalyticsQueueSize: 500,
 });
 ```
 
@@ -77,13 +84,14 @@ const storage: AnalyticsStorage = {
   },
 };
 
-const analytics = createAnalyticsClient({
+Onborn.init({
   apiKey,
+  userId,
   appId,
   platform: "ios",
   appVersion,
   sdkVersion,
-  storage,
+  analyticsStorage: storage,
 });
 ```
 
@@ -162,26 +170,25 @@ sequence that `@onborn/rn-sdk` would emit:
 const common = {
   flowId: "paywall:main",
   sessionId: "session-123",
-  userId: "user-123",
   stepId: "paywall:main:screen",
   paywallId: "main-paywall",
   paywallTemplate: "Main paywall",
 };
 
-await analytics.track({ ...common, type: "paywall_viewed" });
-await analytics.track({
+await Onborn.track({ ...common, type: "paywall_viewed" });
+await Onborn.track({
   ...common,
   type: "paywall_package_selected",
   packageId: "annual",
   productId: "com.app.annual",
 });
-await analytics.track({
+await Onborn.track({
   ...common,
   type: "paywall_purchase_started",
   packageId: "annual",
   productId: "com.app.annual",
 });
-await analytics.track({
+await Onborn.track({
   ...common,
   type: "paywall_converted",
   productId: "com.app.annual",
@@ -195,7 +202,7 @@ await analytics.track({
 summary of attempted, sent, failed, and remaining events.
 
 ```ts
-const summary = await analytics.flush();
+const summary = await Onborn.flush();
 
 if (summary.remaining > 0) {
   console.warn("Some Onborn analytics events are still queued", summary);

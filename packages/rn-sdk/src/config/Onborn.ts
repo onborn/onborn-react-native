@@ -1,21 +1,10 @@
-export type OnbornConfig = {
-  apiKey: string;
-  userId?: string;
-  locale?: string;
-  appId?: string;
-  platform?: "ios" | "android";
-  country?: string;
-  appVersion?: string;
-  userType?: "new" | "returning";
-  sdkVersion?: string;
-  fetchImpl?: typeof fetch;
-  emitAnalyticsEvents?: boolean;
-  emitSdkConnectionSignal?: boolean;
-  autoFlushMs?: number;
-  maxAnalyticsQueueSize?: number;
-};
+import {
+  Onborn as AnalyticsOnborn,
+  type OnbornConfig as AnalyticsOnbornConfig,
+} from "@onborn/analytics";
+import { defaultAnalyticsStorage } from "./analyticsStorage";
 
-let globalOnbornConfig: OnbornConfig | null = null;
+export type OnbornConfig = Omit<AnalyticsOnbornConfig, "analyticsStorage">;
 
 const GLOBAL_CONFIG_KEYS = [
   "apiKey",
@@ -31,23 +20,37 @@ const GLOBAL_CONFIG_KEYS = [
   "emitAnalyticsEvents",
   "emitSdkConnectionSignal",
   "autoFlushMs",
+  "maxAnalyticsBatchSize",
   "maxAnalyticsQueueSize",
+  "analyticsQueueKey",
 ] as const satisfies ReadonlyArray<keyof OnbornConfig>;
 
 export const Onborn = {
+  ...AnalyticsOnborn,
+
   init(config: OnbornConfig): void {
-    globalOnbornConfig = { ...config };
+    AnalyticsOnborn.init({
+      ...config,
+      analyticsStorage: defaultAnalyticsStorage,
+    });
   },
 
   getConfig(): OnbornConfig | null {
-    return globalOnbornConfig;
+    const config = AnalyticsOnborn.getConfig();
+    if (!config) {
+      return null;
+    }
+    const publicConfig = { ...config } as Record<string, unknown>;
+    delete publicConfig.analyticsStorage;
+    return publicConfig as OnbornConfig;
   },
 };
 
 export function resolveOnbornRuntimeConfig<T extends object>(
   overrides?: T,
 ): T & OnbornConfig {
-  if (!globalOnbornConfig) {
+  const globalConfig = Onborn.getConfig();
+  if (!globalConfig) {
     throw new Error(
       "Onborn SDK is not initialized. Call Onborn.init({ apiKey, ...config }) before rendering Onborn components or using Onborn hooks.",
     );
@@ -59,7 +62,7 @@ export function resolveOnbornRuntimeConfig<T extends object>(
   }
 
   return {
-    ...globalOnbornConfig,
+    ...globalConfig,
     ...safeOverrides,
   } as T & OnbornConfig;
 }

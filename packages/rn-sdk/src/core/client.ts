@@ -1,7 +1,4 @@
 import {
-  createAnalyticsClient,
-  type AnalyticsClient,
-  type AnalyticsClientOptions,
   type TrackEventInput,
 } from "@onborn/analytics";
 import type {
@@ -14,7 +11,7 @@ import type {
   RestorePurchasesRequest,
   ValidatePurchaseRequest,
 } from "@onborn/sdk-contracts";
-import { defaultAnalyticsStorage } from "../config/analyticsStorage";
+import { Onborn } from "../config/Onborn";
 import {
   fetchCustomerEntitlements,
   fetchOffering,
@@ -64,7 +61,6 @@ export type RuntimeExperimentContext = NonNullable<GetFlowResponse["experiment"]
 export class ConversionFlowClient {
   private readonly options: ConversionFlowClientOptions;
   private readonly userId: string;
-  private readonly analytics: AnalyticsClient;
   private readonly emitAnalyticsEvents: boolean;
   private experimentContext: RuntimeExperimentContext | null = null;
   private sdkConnectionTracked = false;
@@ -75,9 +71,6 @@ export class ConversionFlowClient {
       locale: resolveRuntimeLocale(options.locale),
     };
     this.userId = options.userId ?? createAnonymousUserId();
-    this.analytics = createAnalyticsClient(
-      this.analyticsOptionsFromConfig(this.options),
-    );
     this.emitAnalyticsEvents = options.emitAnalyticsEvents !== false;
     if (this.emitAnalyticsEvents && options.emitSdkConnectionSignal !== false) {
       // Fire-and-forget: mark SDK connection as soon as client is initialized.
@@ -528,22 +521,21 @@ export class ConversionFlowClient {
     if (!this.emitAnalyticsEvents) {
       return;
     }
-    await this.analytics.flush();
+    await Onborn.flush();
   }
 
-  startAutoFlush(intervalMs = 10_000): void {
+  startAutoFlush(): void {
     if (!this.emitAnalyticsEvents) {
       return;
     }
-    void intervalMs;
-    this.analytics.startAutoFlush();
+    Onborn.startAutoFlush();
   }
 
   stopAutoFlush(): void {
     if (!this.emitAnalyticsEvents) {
       return;
     }
-    this.analytics.stopAutoFlush();
+    Onborn.stopAutoFlush();
   }
 
   private flowFetchOptionsFromConfig(
@@ -613,30 +605,11 @@ export class ConversionFlowClient {
     };
   }
 
-  private analyticsOptionsFromConfig(
-    options: ConversionFlowClientOptions,
-  ): AnalyticsClientOptions {
-    return {
-      apiKey: options.apiKey,
-      appId: options.appId ?? "onborn.app",
-      platform: options.platform ?? inferPlatform(),
-      locale: options.locale,
-      country: options.country,
-      userType: options.userType,
-      appVersion: options.appVersion ?? "0.0.0",
-      sdkVersion: options.sdkVersion ?? "0.1.0",
-      storage: defaultAnalyticsStorage,
-      maxQueueSize: options.maxAnalyticsQueueSize,
-      autoFlushMs: options.autoFlushMs,
-      fetchImpl: options.fetchImpl,
-    };
-  }
-
   private async track(
     input: TrackEventInput,
     experimentOverride?: RuntimeExperimentContext | null,
   ): Promise<void> {
-    await this.analytics.track(
+    await Onborn.track(
       this.withExperimentContext(input, experimentOverride),
     );
   }
@@ -677,7 +650,7 @@ export class ConversionFlowClient {
         sessionId: `sdk-connection:${this.options.flowId}`,
         userId: this.userId,
       });
-      await this.analytics.flush();
+      await Onborn.flush();
       this.sdkConnectionTracked = true;
       sentConnectionSignals.add(signalKey);
     } catch {
@@ -695,9 +668,4 @@ export function createInternalClient(
 function createAnonymousUserId(): string {
   const randomPart = Math.random().toString(36).slice(2, 10);
   return `anon-${Date.now()}-${randomPart}`;
-}
-
-function inferPlatform(): "ios" | "android" {
-  const userAgent = globalThis.navigator?.userAgent?.toLowerCase() ?? "";
-  return userAgent.includes("android") ? "android" : "ios";
 }

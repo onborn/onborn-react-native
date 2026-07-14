@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-beta.1
+
+- Unified runtime initialization with `@onborn/analytics` through `Onborn.init`.
+- Removed separate analytics client creation from the React Native runtime.
+
 ## 0.1.0-beta.0
 
 Initial beta release candidate.
