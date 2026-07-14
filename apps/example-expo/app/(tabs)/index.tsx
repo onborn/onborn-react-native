@@ -1,4 +1,8 @@
-import { SubscriptionFlow, type NativeCustomStepRenderers } from "@onborn/rn-sdk";
+import {
+  Onborn,
+  SubscriptionFlow,
+  type NativeCustomStepRenderers,
+} from "@onborn/rn-sdk";
 import Constants from "expo-constants";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -48,6 +52,14 @@ export default function HomeScreen() {
       }),
     [],
   );
+  Onborn.init({
+    apiKey: DEMO_SDK_API_KEY,
+    userId: deviceUserId,
+    locale: DEMO_LOCALE,
+    platform,
+    appVersion: DEMO_APP_VERSION,
+    fetchImpl: demoOnbornFetch,
+  });
   const resetDemo = useCallback(() => {
     paywallShownRef.current = false;
     setPaymentState(null);
@@ -63,12 +75,6 @@ export default function HomeScreen() {
       <SubscriptionFlow
         key={flowRunId}
         flowId={DEMO_FLOW_ID}
-        apiKey={DEMO_SDK_API_KEY}
-        userId={deviceUserId}
-        locale={DEMO_LOCALE}
-        platform={platform}
-        appVersion={DEMO_APP_VERSION}
-        fetchImpl={demoOnbornFetch}
         fallbackTemplate="fitness"
         InitialLoadingComponent={DemoInitialLoading}
         billingAdapter={billing.billingAdapter}

@@ -112,6 +112,7 @@ export const TextFontFamilySchema = z.enum([
   "Merriweather",
   "Nunito",
   "Playfair Display",
+  "Schibsted Grotesk",
   "Space Grotesk",
   "Sora",
   "Oswald",

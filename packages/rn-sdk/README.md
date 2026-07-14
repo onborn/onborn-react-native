@@ -3,19 +3,18 @@
 Render Onborn onboarding flows and paywalls in React Native or Expo apps.
 
 ```tsx
-import { SubscriptionFlow } from "@onborn/rn-sdk";
+import { Onborn, SubscriptionFlow } from "@onborn/rn-sdk";
+
+Onborn.init({
+  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
+  userId: "user-123",
+  locale: "en",
+  platform: "ios",
+  appVersion: "1.0.0",
+});
 
 export function Onboarding() {
-  return (
-    <SubscriptionFlow
-      apiKey={process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!}
-      flowId="default-onboarding"
-      userId="user-123"
-      locale="en"
-      platform="ios"
-      appVersion="1.0.0"
-    />
-  );
+  return <SubscriptionFlow flowId="default-onboarding" />;
 }
 ```
 
@@ -41,6 +40,30 @@ pnpm add @onborn/rn-sdk
 
 The SDK owns the Onborn API URL. Apps provide an SDK API key and runtime
 context, not a backend base URL.
+
+`@onborn/rn-sdk` depends on `@onborn/analytics` and
+`@onborn/sdk-contracts`, so published apps install only `@onborn/rn-sdk` for
+the full subscription flow SDK.
+
+## Initialize once
+
+Call `Onborn.init` once before rendering Onborn components or using Onborn
+hooks. The SDK does not accept API keys through component props or hook
+arguments.
+
+```ts
+import { Onborn } from "@onborn/rn-sdk";
+
+Onborn.init({
+  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
+  userId: currentUser.id,
+  locale: "en",
+  platform: "ios",
+  appVersion: "1.0.0",
+});
+```
+
+All SDK components and hooks read this runtime configuration.
 
 ### Expo setup
 
@@ -143,9 +166,7 @@ module.exports = {
 import { SubscriptionPaywall } from "@onborn/rn-sdk";
 
 <SubscriptionPaywall
-  apiKey={apiKey}
   paywallId="main-paywall"
-  userId="user-123"
 />;
 ```
 
@@ -171,7 +192,6 @@ const billingAdapter = createNativeStoresBillingAdapter({
 });
 
 <SubscriptionFlow
-  apiKey={apiKey}
   flowId={flowId}
   billingAdapter={billingAdapter}
 />;
@@ -198,7 +218,6 @@ function InitialLoading({ kind }: InitialLoadingComponentProps) {
 }
 
 <SubscriptionFlow
-  apiKey={apiKey}
   flowId={flowId}
   InitialLoadingComponent={InitialLoading}
 />;

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchFlow } from "../config/fetcher";
 import { resolveRuntimeLocale } from "../config/locale";
 import { FALLBACK_TEMPLATES, type FallbackTemplateName } from "../config/templates";
+import { useOnbornRuntimeConfig } from "../config/Onborn";
 import {
   defaultFlowCacheStorage,
   FlowCache,
@@ -11,15 +12,7 @@ import {
 
 export type UseSubscriptionFlowOptions = {
   flowId: string;
-  apiKey: string;
-  userId?: string;
-  locale?: string;
-  platform?: "ios" | "android";
-  country?: string;
-  appVersion?: string;
-  userType?: "new" | "returning";
   fallbackTemplate?: FallbackTemplateName;
-  fetchImpl?: typeof fetch;
   cacheStorage?: FlowCacheStorage;
 };
 
@@ -34,6 +27,7 @@ export type UseSubscriptionFlowState = {
 };
 
 export function useSubscriptionFlow(options: UseSubscriptionFlowOptions): UseSubscriptionFlowState {
+  const runtimeOptions = useOnbornRuntimeConfig(options);
   const [flow, setFlow] = useState<FlowConfig | null>(null);
   const [experiment, setExperiment] = useState<UseSubscriptionFlowState["experiment"]>(null);
   const [paywalls, setPaywalls] = useState<GetFlowResponse["paywalls"]>([]);
@@ -42,25 +36,28 @@ export function useSubscriptionFlow(options: UseSubscriptionFlowOptions): UseSub
   const [source, setSource] = useState<UseSubscriptionFlowState["source"]>(null);
 
   const cache = useMemo(
-    () => new FlowCache(options.cacheStorage ?? defaultFlowCacheStorage),
-    [options.cacheStorage],
+    () => new FlowCache(runtimeOptions.cacheStorage ?? defaultFlowCacheStorage),
+    [runtimeOptions.cacheStorage],
   );
-  const locale = useMemo(() => resolveRuntimeLocale(options.locale), [options.locale]);
+  const locale = useMemo(
+    () => resolveRuntimeLocale(runtimeOptions.locale),
+    [runtimeOptions.locale],
+  );
   const cacheKeyLocale = useMemo(
     () =>
       [
         locale ?? "default",
-        options.platform ?? "platform:any",
-        options.country ?? "country:any",
-        options.appVersion ?? "version:any",
-        options.userType ?? "user:any",
+        runtimeOptions.platform ?? "platform:any",
+        runtimeOptions.country ?? "country:any",
+        runtimeOptions.appVersion ?? "version:any",
+        runtimeOptions.userType ?? "user:any",
       ].join("|"),
     [
       locale,
-      options.appVersion,
-      options.country,
-      options.platform,
-      options.userType,
+      runtimeOptions.appVersion,
+      runtimeOptions.country,
+      runtimeOptions.platform,
+      runtimeOptions.userType,
     ],
   );
 
@@ -68,7 +65,7 @@ export function useSubscriptionFlow(options: UseSubscriptionFlowOptions): UseSub
     setLoading(true);
     setError(null);
 
-    const cached = await cache.getRecord(options.flowId, cacheKeyLocale);
+    const cached = await cache.getRecord(runtimeOptions.flowId, cacheKeyLocale);
     if (cached?.hasPaywallSnapshot) {
       setFlow(cached.config);
       setPaywalls(cached.paywalls);
@@ -79,15 +76,15 @@ export function useSubscriptionFlow(options: UseSubscriptionFlowOptions): UseSub
 
     try {
       const remote = await fetchFlow({
-        flowId: options.flowId,
-        apiKey: options.apiKey,
-        userId: options.userId,
+        flowId: runtimeOptions.flowId,
+        apiKey: runtimeOptions.apiKey,
+        userId: runtimeOptions.userId,
         locale,
-        platform: options.platform,
-        country: options.country,
-        appVersion: options.appVersion,
-        userType: options.userType,
-        fetchImpl: options.fetchImpl,
+        platform: runtimeOptions.platform,
+        country: runtimeOptions.country,
+        appVersion: runtimeOptions.appVersion,
+        userType: runtimeOptions.userType,
+        fetchImpl: runtimeOptions.fetchImpl,
       });
       setFlow(remote.config);
       setPaywalls(remote.paywalls ?? []);
@@ -106,8 +103,8 @@ export function useSubscriptionFlow(options: UseSubscriptionFlowOptions): UseSub
         return;
       }
 
-      if (options.fallbackTemplate) {
-        const fallback = FALLBACK_TEMPLATES[options.fallbackTemplate];
+      if (runtimeOptions.fallbackTemplate) {
+        const fallback = FALLBACK_TEMPLATES[runtimeOptions.fallbackTemplate];
         if (fallback) {
           setFlow(fallback);
           setPaywalls([]);
@@ -126,15 +123,15 @@ export function useSubscriptionFlow(options: UseSubscriptionFlowOptions): UseSub
   }, [
     cache,
     cacheKeyLocale,
-    options.apiKey,
-    options.appVersion,
-    options.country,
-    options.fallbackTemplate,
-    options.fetchImpl,
-    options.flowId,
-    options.platform,
-    options.userId,
-    options.userType,
+    runtimeOptions.apiKey,
+    runtimeOptions.appVersion,
+    runtimeOptions.country,
+    runtimeOptions.fallbackTemplate,
+    runtimeOptions.fetchImpl,
+    runtimeOptions.flowId,
+    runtimeOptions.platform,
+    runtimeOptions.userId,
+    runtimeOptions.userType,
   ]);
 
   useEffect(() => {

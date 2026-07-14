@@ -1,4 +1,4 @@
-import { SubscriptionPaywall } from "@onborn/rn-sdk";
+import { Onborn, SubscriptionPaywall } from "@onborn/rn-sdk";
 import Constants from "expo-constants";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -44,6 +44,14 @@ export default function PaywallScreen() {
       }),
     [],
   );
+  Onborn.init({
+    apiKey: DEMO_SDK_API_KEY,
+    userId: deviceUserId,
+    locale: DEMO_LOCALE,
+    platform,
+    appVersion: DEMO_APP_VERSION,
+    fetchImpl: demoOnbornFetch,
+  });
   const resetDemo = useCallback(() => {
     paywallShownRef.current = false;
     setPaymentState(null);
@@ -58,13 +66,7 @@ export default function PaywallScreen() {
     <View style={styles.container}>
       <SubscriptionPaywall
         key={paywallRunId}
-        apiKey={DEMO_SDK_API_KEY}
         paywallId={DEMO_PAYWALL_ID}
-        userId={deviceUserId}
-        locale={DEMO_LOCALE}
-        platform={platform}
-        appVersion={DEMO_APP_VERSION}
-        fetchImpl={demoOnbornFetch}
         InitialLoadingComponent={DemoInitialLoading}
         billingAdapter={billing.billingAdapter}
         onPaywallShown={() => {

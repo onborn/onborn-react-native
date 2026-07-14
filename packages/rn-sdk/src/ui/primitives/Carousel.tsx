@@ -145,7 +145,7 @@ export function Carousel(props: {
       borderWidth={1}
       borderColor="#2B3340"
       overflow="hidden"
-      style={cardClipStyle}
+      style={cardClipStyle as never}
     >
       <ComponentGradientBg bg={props.cardBg} radius={radius} />
       {props.variant === "testimonial" ? (

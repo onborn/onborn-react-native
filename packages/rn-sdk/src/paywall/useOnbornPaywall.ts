@@ -3,7 +3,8 @@ import {
   type GetPaywallResponse,
 } from "@onborn/sdk-contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createClient, type ConversionFlowClientOptions } from "../core/client";
+import { useOnbornRuntimeConfig } from "../config/Onborn";
+import { createInternalClient } from "../core/client";
 import {
   findPackageWithProduct,
   getPackagesWithProducts,
@@ -17,22 +18,7 @@ import type {
   OnbornRestoreResult,
 } from "./types";
 
-export type UseOnbornPaywallOptions = Pick<
-  ConversionFlowClientOptions,
-  | "apiKey"
-  | "userId"
-  | "locale"
-  | "appId"
-  | "platform"
-  | "country"
-  | "appVersion"
-  | "userType"
-  | "sdkVersion"
-  | "fetchImpl"
-  | "emitAnalyticsEvents"
-  | "emitSdkConnectionSignal"
-  | "autoFlushMs"
-> & {
+export type UseOnbornPaywallOptions = {
   paywallId: string;
   initialPackageId?: string;
   billingAdapter?: OnbornBillingAdapter;
@@ -67,9 +53,10 @@ export type UseOnbornPaywallState = {
 export function useOnbornPaywall(
   options: UseOnbornPaywallOptions,
 ): UseOnbornPaywallState {
+  const runtimeOptions = useOnbornRuntimeConfig(options);
   const [data, setData] = useState<GetPaywallResponse | null>(null);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(
-    options.initialPackageId ?? null,
+    runtimeOptions.initialPackageId ?? null,
   );
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
@@ -78,44 +65,45 @@ export function useOnbornPaywall(
 
   const client = useMemo(
     () =>
-      createClient({
-        apiKey: options.apiKey,
-        flowId: `paywall:${options.paywallId}`,
-        userId: options.userId,
-        locale: options.locale,
-        appId: options.appId,
-        platform: options.platform,
-        country: options.country,
-        appVersion: options.appVersion,
-        userType: options.userType,
-        sdkVersion: options.sdkVersion,
-        fetchImpl: options.fetchImpl,
-        emitAnalyticsEvents: options.emitAnalyticsEvents,
-        emitSdkConnectionSignal: options.emitSdkConnectionSignal ?? false,
-        autoFlushMs: options.autoFlushMs,
+      createInternalClient({
+        apiKey: runtimeOptions.apiKey,
+        flowId: `paywall:${runtimeOptions.paywallId}`,
+        userId: runtimeOptions.userId,
+        locale: runtimeOptions.locale,
+        appId: runtimeOptions.appId,
+        platform: runtimeOptions.platform,
+        country: runtimeOptions.country,
+        appVersion: runtimeOptions.appVersion,
+        userType: runtimeOptions.userType,
+        sdkVersion: runtimeOptions.sdkVersion,
+        fetchImpl: runtimeOptions.fetchImpl,
+        emitAnalyticsEvents: runtimeOptions.emitAnalyticsEvents,
+        emitSdkConnectionSignal:
+          runtimeOptions.emitSdkConnectionSignal ?? false,
+        autoFlushMs: runtimeOptions.autoFlushMs,
       }),
     [
-      options.apiKey,
-      options.appId,
-      options.appVersion,
-      options.autoFlushMs,
-      options.country,
-      options.emitAnalyticsEvents,
-      options.emitSdkConnectionSignal,
-      options.fetchImpl,
-      options.locale,
-      options.paywallId,
-      options.platform,
-      options.sdkVersion,
-      options.userId,
-      options.userType,
+      runtimeOptions.apiKey,
+      runtimeOptions.appId,
+      runtimeOptions.appVersion,
+      runtimeOptions.autoFlushMs,
+      runtimeOptions.country,
+      runtimeOptions.emitAnalyticsEvents,
+      runtimeOptions.emitSdkConnectionSignal,
+      runtimeOptions.fetchImpl,
+      runtimeOptions.locale,
+      runtimeOptions.paywallId,
+      runtimeOptions.platform,
+      runtimeOptions.sdkVersion,
+      runtimeOptions.userId,
+      runtimeOptions.userType,
     ],
   );
 
   const packages = useMemo(
     () =>
-      getPackagesWithProducts(data?.offering, data?.products, options.platform),
-    [data?.offering, data?.products, options.platform],
+      getPackagesWithProducts(data?.offering, data?.products, runtimeOptions.platform),
+    [data?.offering, data?.products, runtimeOptions.platform],
   );
 
   const selectedPackage = useMemo(() => {
@@ -128,12 +116,12 @@ export function useOnbornPaywall(
     setLoading(true);
     setError(null);
     try {
-      const response = await client.loadPaywall(options.paywallId);
-      const products = await loadLocalizedProducts(options.billingAdapter, {
+      const response = await client.loadPaywall(runtimeOptions.paywallId);
+      const products = await loadLocalizedProducts(runtimeOptions.billingAdapter, {
         paywall: response.paywall,
         offering: response.offering,
         products: response.products,
-        userId: options.userId,
+        userId: runtimeOptions.userId,
       });
       setData({ ...response, products });
       setSelectedPackageId((current) => {
@@ -150,7 +138,7 @@ export function useOnbornPaywall(
     } finally {
       setLoading(false);
     }
-  }, [client, options.billingAdapter, options.paywallId, options.userId]);
+  }, [client, runtimeOptions.billingAdapter, runtimeOptions.paywallId, runtimeOptions.userId]);
 
   useEffect(() => {
     void load();
@@ -188,7 +176,7 @@ export function useOnbornPaywall(
       if (!item || !data?.offering) {
         throw new Error("No paywall package selected");
       }
-      if (!options.billingAdapter) {
+      if (!runtimeOptions.billingAdapter) {
         throw new Error(
           "Missing ONBORN billingAdapter. Provide one to purchase from a custom paywall.",
         );
@@ -196,19 +184,19 @@ export function useOnbornPaywall(
 
       if (intent === "trial") {
         try {
-          const shouldContinue = await options.onStartTrial?.(item);
+          const shouldContinue = await runtimeOptions.onStartTrial?.(item);
           if (shouldContinue === false) {
             return { success: false, packageId: item.package.id };
           }
         } catch (trialError) {
           const errorObject = toError(trialError);
-          options.onPurchaseFailed?.(errorObject);
+          runtimeOptions.onPurchaseFailed?.(errorObject);
           throw errorObject;
         }
       }
 
       setPurchasing(true);
-      options.onPurchaseStarted?.(item);
+      runtimeOptions.onPurchaseStarted?.(item);
       const paywallSessionId = `paywall:${data.paywall.id}`;
       const paywallStepId = `paywall:${data.paywall.id}:screen`;
       const purchaseProductId =
@@ -239,12 +227,12 @@ export function useOnbornPaywall(
           .catch(() => {});
       }
       try {
-        const adapterResult = await options.billingAdapter.purchasePackage({
+        const adapterResult = await runtimeOptions.billingAdapter.purchasePackage({
           paywall: data.paywall,
           offering: data.offering,
           package: item.package,
           product: item.product,
-          userId: options.userId,
+          userId: runtimeOptions.userId,
         });
         const result = adapterResult.success
           ? await validateBillingPurchase({
@@ -253,13 +241,13 @@ export function useOnbornPaywall(
               offering: data.offering,
               item,
               result: adapterResult,
-              userId: options.userId,
+              userId: runtimeOptions.userId,
             })
           : adapterResult;
-        options.onPurchaseCompleted?.(result);
+        runtimeOptions.onPurchaseCompleted?.(result);
         notifyEntitlementsChanged(
           result.entitlements,
-          options.onEntitlementsChanged,
+          runtimeOptions.onEntitlementsChanged,
         );
         if (result.success && result.status === "validated") {
           await client.trackPaywallConverted({
@@ -287,7 +275,7 @@ export function useOnbornPaywall(
         return result;
       } catch (purchaseError) {
         const errorObject = toError(purchaseError);
-        options.onPurchaseFailed?.(errorObject);
+        runtimeOptions.onPurchaseFailed?.(errorObject);
         void client
           .trackPaywallPurchaseFailed({
             sessionId: paywallSessionId,
@@ -306,7 +294,7 @@ export function useOnbornPaywall(
         setPurchasing(false);
       }
     },
-    [client, data, options, packages, selectedPackage],
+    [client, data, runtimeOptions, packages, selectedPackage],
   );
 
   const purchasePackage = useCallback(
@@ -321,7 +309,7 @@ export function useOnbornPaywall(
 
   const restorePurchases =
     useCallback(async (): Promise<OnbornRestoreResult> => {
-      if (!options.billingAdapter?.restorePurchases) {
+      if (!runtimeOptions.billingAdapter?.restorePurchases) {
         throw new Error("Missing restorePurchases on ONBORN billingAdapter.");
       }
 
@@ -339,22 +327,22 @@ export function useOnbornPaywall(
           .catch(() => {});
       }
       try {
-        const adapterResult = await options.billingAdapter.restorePurchases({
+        const adapterResult = await runtimeOptions.billingAdapter.restorePurchases({
           paywall: data?.paywall,
           offering: data?.offering,
           products: data?.products ?? [],
-          userId: options.userId,
+          userId: runtimeOptions.userId,
         });
         const result = await validateBillingRestore({
           client,
           offering: data?.offering,
           result: adapterResult,
-          userId: options.userId,
+          userId: runtimeOptions.userId,
         });
-        options.onRestoreCompleted?.(result);
+        runtimeOptions.onRestoreCompleted?.(result);
         notifyEntitlementsChanged(
           result.entitlements,
-          options.onEntitlementsChanged,
+          runtimeOptions.onEntitlementsChanged,
         );
         if (restorePaywall) {
           void client
@@ -371,7 +359,7 @@ export function useOnbornPaywall(
         return result;
       } catch (restoreError) {
         const errorObject = toError(restoreError);
-        options.onRestoreFailed?.(errorObject);
+        runtimeOptions.onRestoreFailed?.(errorObject);
         if (restorePaywall) {
           void client
             .trackPaywallRestoreFailed({
@@ -388,31 +376,31 @@ export function useOnbornPaywall(
       } finally {
         setRestoring(false);
       }
-    }, [client, data, options]);
+    }, [client, data, runtimeOptions]);
 
   const refetchCustomerEntitlements =
     useCallback(async (): Promise<OnbornRestoreResult> => {
-      if (!options.billingAdapter?.refetchCustomerEntitlements) {
+      if (!runtimeOptions.billingAdapter?.refetchCustomerEntitlements) {
         throw new Error(
           "Missing refetchCustomerEntitlements on ONBORN billingAdapter.",
         );
       }
       const adapterResult =
-        await options.billingAdapter.refetchCustomerEntitlements({
-          userId: options.userId,
+        await runtimeOptions.billingAdapter.refetchCustomerEntitlements({
+          userId: runtimeOptions.userId,
         });
       const result = await validateBillingRestore({
         client,
         offering: data?.offering,
         result: adapterResult,
-        userId: options.userId,
+        userId: runtimeOptions.userId,
       });
       notifyEntitlementsChanged(
         result.entitlements,
-        options.onEntitlementsChanged,
+        runtimeOptions.onEntitlementsChanged,
       );
       return result;
-    }, [client, data?.offering, options]);
+    }, [client, data?.offering, runtimeOptions]);
 
   return {
     data,

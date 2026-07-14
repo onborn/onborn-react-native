@@ -142,26 +142,47 @@ Bare RN checklist:
 ## Quick Start
 
 ```tsx
-import { SubscriptionFlow } from "@onborn/rn-sdk";
+import { Onborn, SubscriptionFlow } from "@onborn/rn-sdk";
 import { View } from "react-native";
+
+Onborn.init({
+  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
+  userId: "user-123",
+  locale: "en",
+  platform: "ios",
+  appVersion: "1.0.0",
+});
 
 export function OnboardingScreen() {
   return (
     <View style={{ flex: 1 }}>
-      <SubscriptionFlow
-        apiKey={process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!}
-        flowId="default-onboarding"
-        userId="user-123"
-        locale="en"
-        platform="ios"
-        appVersion="1.0.0"
-      />
+      <SubscriptionFlow flowId="default-onboarding" />
     </View>
   );
 }
 ```
 
 The backend decides which published flow or experiment variant should be returned.
+
+## Initialize Once
+
+Initialize the SDK once before rendering Onborn components or using Onborn
+hooks. Runtime fields such as `apiKey`, `userId`, `locale`, `platform`, and
+`appVersion` belong in `Onborn.init`, not component props.
+
+```ts
+import { Onborn } from "@onborn/rn-sdk";
+
+Onborn.init({
+  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
+  userId: currentUser.id,
+  locale: "en",
+  platform: "ios",
+  appVersion: "1.0.0",
+});
+```
+
+The SDK does not accept API keys through component props or hook arguments.
 
 ## Standalone Paywall
 
@@ -173,12 +194,7 @@ export function PaywallScreen() {
   return (
     <View style={{ flex: 1 }}>
       <SubscriptionPaywall
-        apiKey={process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!}
         paywallId="main-paywall"
-        userId="user-123"
-        locale="en"
-        platform="ios"
-        appVersion="1.0.0"
       />
     </View>
   );
@@ -207,7 +223,6 @@ function OnbornLoading({ kind, flowId, paywallId }: InitialLoadingComponentProps
 }
 
 <SubscriptionFlow
-  apiKey={apiKey}
   flowId={flowId}
   InitialLoadingComponent={OnbornLoading}
 />;
@@ -215,19 +230,18 @@ function OnbornLoading({ kind, flowId, paywallId }: InitialLoadingComponentProps
 
 ## Runtime Context
 
-Pass these fields whenever possible:
+Set these fields in `Onborn.init` whenever possible:
 
-```tsx
-<SubscriptionFlow
-  apiKey={apiKey}
-  flowId={flowId}
-  userId={user.id}
-  locale="en"
-  platform="ios"
-  country="US"
-  appVersion="1.0.0"
-  userType="new"
-/>
+```ts
+Onborn.init({
+  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
+  userId: user.id,
+  locale: "en",
+  platform: "ios",
+  country: "US",
+  appVersion: "1.0.0",
+  userType: "new",
+});
 ```
 
 These values are used for:
@@ -247,14 +261,15 @@ complete event data.
 Disable runtime analytics only for internal previews or test harnesses:
 
 ```tsx
-import { createClient } from "@onborn/rn-sdk";
+import { Onborn, SubscriptionFlow } from "@onborn/rn-sdk";
 
-const client = createClient({
-  apiKey,
-  flowId,
+Onborn.init({
+  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
   emitAnalyticsEvents: false,
   emitSdkConnectionSignal: false,
 });
+
+<SubscriptionFlow flowId={flowId} />;
 ```
 
 For app usage, keep analytics enabled.
@@ -292,7 +307,6 @@ function Screen() {
 
   return (
     <SubscriptionFlow
-      apiKey={apiKey}
       flowId={flowId}
       billingAdapter={billingAdapter}
     />
@@ -327,9 +341,7 @@ const billingAdapter = createRevenueCatBillingAdapter({
 });
 
 <SubscriptionPaywall
-  apiKey={apiKey}
   paywallId={paywallId}
-  userId={userId}
   billingAdapter={billingAdapter}
 />;
 ```
@@ -407,7 +419,6 @@ Production checklist:
 
 ```tsx
 <SubscriptionFlow
-  apiKey={apiKey}
   flowId={flowId}
   billingAdapter={billingAdapter}
   onStartTrial={(item) => {
@@ -451,7 +462,6 @@ const customStepRenderers: NativeCustomStepRenderers = {
 };
 
 <SubscriptionFlow
-  apiKey={apiKey}
   flowId={flowId}
   customStepRenderers={customStepRenderers}
   onCustomStepMissing={({ rendererKey }) => {
@@ -482,7 +492,6 @@ Runtime strategy:
 
 ```tsx
 <SubscriptionFlow
-  apiKey={apiKey}
   flowId={flowId}
   fallbackTemplate="fitness"
 />
@@ -498,13 +507,14 @@ Current beta SDK runtime URL behavior:
 - production package will use `https://api.onborn.app`
 
 The runtime API URL is owned by the package. Customers should not pass an
-`apiBaseUrl`; they only pass `apiKey`, `flowId` or `paywallId`, and runtime
-context such as `userId`, `locale`, `platform`, `country`, `appVersion`, and
-`userType`.
+`apiBaseUrl`. They initialize the SDK once with `Onborn.init`, then pass only
+surface identifiers such as `flowId` or `paywallId` to rendered SDK components.
 
 Local demo apps can still inject an internal `fetchImpl` while developing:
 
 ```tsx
+import { Onborn, SubscriptionFlow } from "@onborn/rn-sdk";
+
 const testingFetch: typeof fetch = (input, init) => {
   const url = String(input).replace(
     "https://api.testing.onborn.app",
@@ -513,10 +523,13 @@ const testingFetch: typeof fetch = (input, init) => {
   return fetch(url, init);
 };
 
+Onborn.init({
+  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
+  fetchImpl: testingFetch,
+});
+
 <SubscriptionFlow
-  apiKey={apiKey}
   flowId={flowId}
-  fetchImpl={testingFetch}
 />;
 ```
 

@@ -95,7 +95,7 @@ export function InputPrimitive(props: {
           backgroundColor: isTransparent ? "transparent" : props.bg ?? "#171B22",
           borderColor,
         }}
-        style={inputStyle}
+        style={inputStyle as never}
       />
     </YStack>
   );

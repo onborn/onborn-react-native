@@ -91,7 +91,7 @@ export function ImagePrimitive(props: {
         cachePolicy="memory-disk"
         contentFit={props.resizeMode ?? "cover"}
         transition={160}
-        style={StyleSheet.absoluteFill}
+        style={StyleSheet.absoluteFill as ImageStyle}
       />
       {overlayOpacity > 0 ? (
         <View

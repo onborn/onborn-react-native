@@ -3,7 +3,8 @@ import {
   type GetOfferingResponse,
 } from "@onborn/sdk-contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createClient, type ConversionFlowClientOptions } from "../core/client";
+import { useOnbornRuntimeConfig } from "../config/Onborn";
+import { createInternalClient } from "../core/client";
 import {
   findPackageWithProduct,
   getPackagesWithProducts,
@@ -17,22 +18,7 @@ import type {
   OnbornRestoreResult,
 } from "./types";
 
-export type UseOnbornOfferingOptions = Pick<
-  ConversionFlowClientOptions,
-  | "apiKey"
-  | "userId"
-  | "locale"
-  | "appId"
-  | "platform"
-  | "country"
-  | "appVersion"
-  | "userType"
-  | "sdkVersion"
-  | "fetchImpl"
-  | "emitAnalyticsEvents"
-  | "emitSdkConnectionSignal"
-  | "autoFlushMs"
-> & {
+export type UseOnbornOfferingOptions = {
   offeringId: string;
   initialPackageId?: string;
   billingAdapter?: OnbornBillingAdapter;
@@ -63,9 +49,10 @@ export type UseOnbornOfferingState = {
 export function useOnbornOffering(
   options: UseOnbornOfferingOptions,
 ): UseOnbornOfferingState {
+  const runtimeOptions = useOnbornRuntimeConfig(options);
   const [data, setData] = useState<GetOfferingResponse | null>(null);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(
-    options.initialPackageId ?? null,
+    runtimeOptions.initialPackageId ?? null,
   );
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
@@ -74,44 +61,49 @@ export function useOnbornOffering(
 
   const client = useMemo(
     () =>
-      createClient({
-        apiKey: options.apiKey,
-        flowId: `offering:${options.offeringId}`,
-        userId: options.userId,
-        locale: options.locale,
-        appId: options.appId,
-        platform: options.platform,
-        country: options.country,
-        appVersion: options.appVersion,
-        userType: options.userType,
-        sdkVersion: options.sdkVersion,
-        fetchImpl: options.fetchImpl,
-        emitAnalyticsEvents: options.emitAnalyticsEvents,
-        emitSdkConnectionSignal: options.emitSdkConnectionSignal ?? false,
-        autoFlushMs: options.autoFlushMs,
+      createInternalClient({
+        apiKey: runtimeOptions.apiKey,
+        flowId: `offering:${runtimeOptions.offeringId}`,
+        userId: runtimeOptions.userId,
+        locale: runtimeOptions.locale,
+        appId: runtimeOptions.appId,
+        platform: runtimeOptions.platform,
+        country: runtimeOptions.country,
+        appVersion: runtimeOptions.appVersion,
+        userType: runtimeOptions.userType,
+        sdkVersion: runtimeOptions.sdkVersion,
+        fetchImpl: runtimeOptions.fetchImpl,
+        emitAnalyticsEvents: runtimeOptions.emitAnalyticsEvents,
+        emitSdkConnectionSignal:
+          runtimeOptions.emitSdkConnectionSignal ?? false,
+        autoFlushMs: runtimeOptions.autoFlushMs,
       }),
     [
-      options.apiKey,
-      options.appId,
-      options.appVersion,
-      options.autoFlushMs,
-      options.country,
-      options.emitAnalyticsEvents,
-      options.emitSdkConnectionSignal,
-      options.fetchImpl,
-      options.locale,
-      options.offeringId,
-      options.platform,
-      options.sdkVersion,
-      options.userId,
-      options.userType,
+      runtimeOptions.apiKey,
+      runtimeOptions.appId,
+      runtimeOptions.appVersion,
+      runtimeOptions.autoFlushMs,
+      runtimeOptions.country,
+      runtimeOptions.emitAnalyticsEvents,
+      runtimeOptions.emitSdkConnectionSignal,
+      runtimeOptions.fetchImpl,
+      runtimeOptions.locale,
+      runtimeOptions.offeringId,
+      runtimeOptions.platform,
+      runtimeOptions.sdkVersion,
+      runtimeOptions.userId,
+      runtimeOptions.userType,
     ],
   );
 
   const packages = useMemo(
     () =>
-      getPackagesWithProducts(data?.offering, data?.products, options.platform),
-    [data?.offering, data?.products, options.platform],
+      getPackagesWithProducts(
+        data?.offering,
+        data?.products,
+        runtimeOptions.platform,
+      ),
+    [data?.offering, data?.products, runtimeOptions.platform],
   );
 
   const selectedPackage = useMemo(() => {
@@ -124,12 +116,15 @@ export function useOnbornOffering(
     setLoading(true);
     setError(null);
     try {
-      const response = await client.loadOffering(options.offeringId);
-      const products = await loadLocalizedProducts(options.billingAdapter, {
-        offering: response.offering,
-        products: response.products,
-        userId: options.userId,
-      });
+      const response = await client.loadOffering(runtimeOptions.offeringId);
+      const products = await loadLocalizedProducts(
+        runtimeOptions.billingAdapter,
+        {
+          offering: response.offering,
+          products: response.products,
+          userId: runtimeOptions.userId,
+        },
+      );
       setData({ ...response, products });
       setSelectedPackageId((current) => {
         if (
@@ -145,7 +140,12 @@ export function useOnbornOffering(
     } finally {
       setLoading(false);
     }
-  }, [client, options.billingAdapter, options.offeringId, options.userId]);
+  }, [
+    client,
+    runtimeOptions.billingAdapter,
+    runtimeOptions.offeringId,
+    runtimeOptions.userId,
+  ]);
 
   useEffect(() => {
     void load();
@@ -162,104 +162,106 @@ export function useOnbornOffering(
       if (!item || !data?.offering) {
         throw new Error("No offering package selected");
       }
-      if (!options.billingAdapter) {
+      if (!runtimeOptions.billingAdapter) {
         throw new Error(
           "Missing ONBORN billingAdapter. Provide one to purchase from a custom paywall.",
         );
       }
 
       setPurchasing(true);
-      options.onPurchaseStarted?.(item);
+      runtimeOptions.onPurchaseStarted?.(item);
       try {
-        const adapterResult = await options.billingAdapter.purchasePackage({
-          offering: data.offering,
-          package: item.package,
-          product: item.product,
-          userId: options.userId,
-        });
+        const adapterResult =
+          await runtimeOptions.billingAdapter.purchasePackage({
+            offering: data.offering,
+            package: item.package,
+            product: item.product,
+            userId: runtimeOptions.userId,
+          });
         const result = adapterResult.success
           ? await validateBillingPurchase({
               client,
               offering: data.offering,
               item,
               result: adapterResult,
-              userId: options.userId,
+              userId: runtimeOptions.userId,
             })
           : adapterResult;
-        options.onPurchaseCompleted?.(result);
+        runtimeOptions.onPurchaseCompleted?.(result);
         notifyEntitlementsChanged(
           result.entitlements,
-          options.onEntitlementsChanged,
+          runtimeOptions.onEntitlementsChanged,
         );
         return result;
       } catch (purchaseError) {
         const errorObject = toError(purchaseError);
-        options.onPurchaseFailed?.(errorObject);
+        runtimeOptions.onPurchaseFailed?.(errorObject);
         throw errorObject;
       } finally {
         setPurchasing(false);
       }
     },
-    [client, data?.offering, options, packages, selectedPackage],
+    [client, data?.offering, runtimeOptions, packages, selectedPackage],
   );
 
   const restorePurchases =
     useCallback(async (): Promise<OnbornRestoreResult> => {
-      if (!options.billingAdapter?.restorePurchases) {
+      if (!runtimeOptions.billingAdapter?.restorePurchases) {
         throw new Error("Missing restorePurchases on ONBORN billingAdapter.");
       }
 
       setRestoring(true);
       try {
-        const adapterResult = await options.billingAdapter.restorePurchases({
-          offering: data?.offering,
-          products: data?.products ?? [],
-          userId: options.userId,
-        });
+        const adapterResult =
+          await runtimeOptions.billingAdapter.restorePurchases({
+            offering: data?.offering,
+            products: data?.products ?? [],
+            userId: runtimeOptions.userId,
+          });
         const result = await validateBillingRestore({
           client,
           offering: data?.offering,
           result: adapterResult,
-          userId: options.userId,
+          userId: runtimeOptions.userId,
         });
-        options.onRestoreCompleted?.(result);
+        runtimeOptions.onRestoreCompleted?.(result);
         notifyEntitlementsChanged(
           result.entitlements,
-          options.onEntitlementsChanged,
+          runtimeOptions.onEntitlementsChanged,
         );
         return result;
       } catch (restoreError) {
         const errorObject = toError(restoreError);
-        options.onRestoreFailed?.(errorObject);
+        runtimeOptions.onRestoreFailed?.(errorObject);
         throw errorObject;
       } finally {
         setRestoring(false);
       }
-    }, [client, data, options]);
+    }, [client, data, runtimeOptions]);
 
   const refetchCustomerEntitlements =
     useCallback(async (): Promise<OnbornRestoreResult> => {
-      if (!options.billingAdapter?.refetchCustomerEntitlements) {
+      if (!runtimeOptions.billingAdapter?.refetchCustomerEntitlements) {
         throw new Error(
           "Missing refetchCustomerEntitlements on ONBORN billingAdapter.",
         );
       }
       const adapterResult =
-        await options.billingAdapter.refetchCustomerEntitlements({
-          userId: options.userId,
+        await runtimeOptions.billingAdapter.refetchCustomerEntitlements({
+          userId: runtimeOptions.userId,
         });
       const result = await validateBillingRestore({
         client,
         offering: data?.offering,
         result: adapterResult,
-        userId: options.userId,
+        userId: runtimeOptions.userId,
       });
       notifyEntitlementsChanged(
         result.entitlements,
-        options.onEntitlementsChanged,
+        runtimeOptions.onEntitlementsChanged,
       );
       return result;
-    }, [client, data?.offering, options]);
+    }, [client, data?.offering, runtimeOptions]);
 
   return {
     data,

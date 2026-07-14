@@ -85,7 +85,7 @@ export function SkipButton(props: {
         pointerEvents={props.disableInteractionState ? "none" : undefined}
         hoverStyle={{ opacity: props.disableInteractionState ? 1 : 0.86 }}
         pressStyle={{ opacity: props.disableInteractionState ? 1 : 0.72 }}
-        style={props.style}
+        style={props.style as never}
       >
         {props.iconPosition !== "right" ? icon : null}
         {showText ? (

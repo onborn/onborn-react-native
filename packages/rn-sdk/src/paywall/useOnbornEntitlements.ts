@@ -1,21 +1,9 @@
 import { type CustomerEntitlementsResponse } from "@onborn/sdk-contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createClient, type ConversionFlowClientOptions } from "../core/client";
+import { useOnbornRuntimeConfig } from "../config/Onborn";
+import { createInternalClient } from "../core/client";
 
-export type UseOnbornEntitlementsOptions = Pick<
-  ConversionFlowClientOptions,
-  | "apiKey"
-  | "userId"
-  | "locale"
-  | "appId"
-  | "platform"
-  | "appVersion"
-  | "sdkVersion"
-  | "fetchImpl"
-  | "emitAnalyticsEvents"
-  | "emitSdkConnectionSignal"
-  | "autoFlushMs"
-> & {
+export type UseOnbornEntitlementsOptions = {
   autoLoad?: boolean;
 };
 
@@ -30,38 +18,40 @@ export type UseOnbornEntitlementsState = {
 export function useOnbornEntitlements(
   options: UseOnbornEntitlementsOptions,
 ): UseOnbornEntitlementsState {
+  const runtimeOptions = useOnbornRuntimeConfig(options);
   const [data, setData] = useState<CustomerEntitlementsResponse | null>(null);
   const [loading, setLoading] = useState(options.autoLoad !== false);
   const [error, setError] = useState<string | null>(null);
 
   const client = useMemo(
     () =>
-      createClient({
-        apiKey: options.apiKey,
+      createInternalClient({
+        apiKey: runtimeOptions.apiKey,
         flowId: "entitlements",
-        userId: options.userId,
-        locale: options.locale,
-        appId: options.appId,
-        platform: options.platform,
-        appVersion: options.appVersion,
-        sdkVersion: options.sdkVersion,
-        fetchImpl: options.fetchImpl,
-        emitAnalyticsEvents: options.emitAnalyticsEvents ?? false,
-        emitSdkConnectionSignal: options.emitSdkConnectionSignal ?? false,
-        autoFlushMs: options.autoFlushMs,
+        userId: runtimeOptions.userId,
+        locale: runtimeOptions.locale,
+        appId: runtimeOptions.appId,
+        platform: runtimeOptions.platform,
+        appVersion: runtimeOptions.appVersion,
+        sdkVersion: runtimeOptions.sdkVersion,
+        fetchImpl: runtimeOptions.fetchImpl,
+        emitAnalyticsEvents: runtimeOptions.emitAnalyticsEvents ?? false,
+        emitSdkConnectionSignal:
+          runtimeOptions.emitSdkConnectionSignal ?? false,
+        autoFlushMs: runtimeOptions.autoFlushMs,
       }),
     [
-      options.apiKey,
-      options.appId,
-      options.appVersion,
-      options.autoFlushMs,
-      options.emitAnalyticsEvents,
-      options.emitSdkConnectionSignal,
-      options.fetchImpl,
-      options.locale,
-      options.platform,
-      options.sdkVersion,
-      options.userId,
+      runtimeOptions.apiKey,
+      runtimeOptions.appId,
+      runtimeOptions.appVersion,
+      runtimeOptions.autoFlushMs,
+      runtimeOptions.emitAnalyticsEvents,
+      runtimeOptions.emitSdkConnectionSignal,
+      runtimeOptions.fetchImpl,
+      runtimeOptions.locale,
+      runtimeOptions.platform,
+      runtimeOptions.sdkVersion,
+      runtimeOptions.userId,
     ],
   );
 
@@ -69,7 +59,9 @@ export function useOnbornEntitlements(
     setLoading(true);
     setError(null);
     try {
-      const response = await client.loadCustomerEntitlements(options.userId);
+      const response = await client.loadCustomerEntitlements(
+        runtimeOptions.userId,
+      );
       setData(response);
       return response;
     } catch (loadError) {
@@ -79,7 +71,7 @@ export function useOnbornEntitlements(
     } finally {
       setLoading(false);
     }
-  }, [client, options.userId]);
+  }, [client, runtimeOptions.userId]);
 
   useEffect(() => {
     if (options.autoLoad === false) {

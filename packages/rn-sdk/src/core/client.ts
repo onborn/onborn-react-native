@@ -57,8 +57,6 @@ export type ConversionFlowClientOptions = {
   fetchImpl?: typeof fetch;
 };
 
-export type ClientOptions = ConversionFlowClientOptions;
-
 const sentConnectionSignals = new Set<string>();
 
 export type RuntimeExperimentContext = NonNullable<GetFlowResponse["experiment"]>;
@@ -688,7 +686,7 @@ export class ConversionFlowClient {
   }
 }
 
-export function createClient(
+export function createInternalClient(
   options: ConversionFlowClientOptions,
 ): ConversionFlowClient {
   return new ConversionFlowClient(options);

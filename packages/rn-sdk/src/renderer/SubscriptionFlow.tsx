@@ -45,7 +45,7 @@ import {
   STEP_TRANSITION_MS,
 } from "./step-transitions";
 import {
-  createClient,
+  createInternalClient,
   type ConversionFlowClient,
   type ConversionFlowClientOptions,
   type RuntimeExperimentContext,
@@ -87,6 +87,7 @@ import {
   validateBillingPurchase,
   validateBillingRestore,
 } from "../paywall";
+import { useOnbornRuntimeConfig } from "../config/Onborn";
 
 export type SubscriptionFlowStepComponentProps = {
   step: RuntimeStep;
@@ -254,16 +255,7 @@ export type SubscriptionFlowInternalProps = {
 };
 
 export type SubscriptionFlowProps = {
-  apiKey: string;
   flowId: string;
-  userId?: string;
-  locale?: string;
-  appId?: string;
-  platform?: ConversionFlowClientOptions["platform"];
-  country?: string;
-  appVersion?: string;
-  userType?: ConversionFlowClientOptions["userType"];
-  sdkVersion?: string;
   fallbackTemplate?: FallbackTemplateName;
   initialStepId?: string;
   onNextStep?: SubscriptionFlowInternalProps["onNextStep"];
@@ -283,23 +275,12 @@ export type SubscriptionFlowProps = {
   onPaywallShown?: SubscriptionFlowInternalProps["onPaywallShown"];
   customStepRenderers?: NativeCustomStepRenderers;
   onCustomStepMissing?: SubscriptionFlowInternalProps["onCustomStepMissing"];
-  fetchImpl?: typeof fetch;
   cacheStorage?: FlowCacheStorage;
   InitialLoadingComponent?: React.ComponentType<InitialLoadingComponentProps>;
 };
 
 export type SubscriptionPaywallProps = {
-  apiKey: string;
   paywallId: string;
-  userId?: string;
-  locale?: string;
-  appId?: string;
-  platform?: ConversionFlowClientOptions["platform"];
-  country?: string;
-  appVersion?: string;
-  userType?: ConversionFlowClientOptions["userType"];
-  sdkVersion?: string;
-  fetchImpl?: typeof fetch;
   billingAdapter?: OnbornBillingAdapter;
   onStartTrial?: SubscriptionFlowInternalProps["onStartTrial"];
   onPurchaseStarted?: SubscriptionFlowInternalProps["onPurchaseStarted"];
@@ -1217,61 +1198,55 @@ function useAnalyticsAppStateFlush(client: ConversionFlowClient): void {
 }
 
 export function SubscriptionFlow(props: SubscriptionFlowProps) {
+  const runtimeOptions = useOnbornRuntimeConfig(props);
   const sessionId = useMemo(
     () => `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    [props.flowId],
+    [runtimeOptions.flowId],
   );
   const runtimeUserId = useMemo(
-    () => props.userId ?? createRuntimeAnonymousUserId("flow"),
-    [props.userId],
+    () => runtimeOptions.userId ?? createRuntimeAnonymousUserId("flow"),
+    [runtimeOptions.userId],
   );
   const locale = useMemo(
-    () => resolveRuntimeLocale(props.locale),
-    [props.locale],
+    () => resolveRuntimeLocale(runtimeOptions.locale),
+    [runtimeOptions.locale],
   );
+  const platform =
+    runtimeOptions.platform ?? (Platform.OS === "android" ? "android" : "ios");
   const client = useMemo(
     () =>
-      createClient({
-        apiKey: props.apiKey,
-        flowId: props.flowId,
+      createInternalClient({
+        apiKey: runtimeOptions.apiKey,
+        flowId: runtimeOptions.flowId,
         userId: runtimeUserId,
         locale,
-        appId: props.appId,
-        platform:
-          props.platform ?? (Platform.OS === "android" ? "android" : "ios"),
-        country: props.country,
-        appVersion: props.appVersion,
-        userType: props.userType,
-        sdkVersion: props.sdkVersion,
-        fetchImpl: props.fetchImpl,
+        appId: runtimeOptions.appId,
+        platform,
+        country: runtimeOptions.country,
+        appVersion: runtimeOptions.appVersion,
+        userType: runtimeOptions.userType,
+        sdkVersion: runtimeOptions.sdkVersion,
+        fetchImpl: runtimeOptions.fetchImpl,
       }),
     [
-      props.apiKey,
-      props.appId,
-      props.appVersion,
-      props.country,
-      props.fetchImpl,
-      props.flowId,
+      runtimeOptions.apiKey,
+      runtimeOptions.appId,
+      runtimeOptions.appVersion,
+      runtimeOptions.country,
+      runtimeOptions.fetchImpl,
+      runtimeOptions.flowId,
       locale,
-      props.platform,
+      platform,
       runtimeUserId,
-      props.sdkVersion,
-      props.userType,
+      runtimeOptions.sdkVersion,
+      runtimeOptions.userType,
     ],
   );
   useAnalyticsAppStateFlush(client);
   const { flow, paywalls, experiment, loading } = useSubscriptionFlow({
-    apiKey: props.apiKey,
-    flowId: props.flowId,
-    userId: runtimeUserId,
-    locale,
-    platform: props.platform ?? (Platform.OS === "android" ? "android" : "ios"),
-    country: props.country,
-    appVersion: props.appVersion,
-    userType: props.userType,
-    fallbackTemplate: props.fallbackTemplate,
-    fetchImpl: props.fetchImpl,
-    cacheStorage: props.cacheStorage,
+    flowId: runtimeOptions.flowId,
+    fallbackTemplate: runtimeOptions.fallbackTemplate,
+    cacheStorage: runtimeOptions.cacheStorage,
   });
   const localizedPaywalls = useMemo(
     () =>
@@ -1286,7 +1261,7 @@ export function SubscriptionFlow(props: SubscriptionFlowProps) {
     return (
       <InitialLoadingFallback
         InitialLoadingComponent={props.InitialLoadingComponent}
-        flowId={props.flowId}
+        flowId={runtimeOptions.flowId}
         kind="flow"
         loading={loading}
       />
@@ -1309,9 +1284,7 @@ export function SubscriptionFlow(props: SubscriptionFlowProps) {
       onLoadingEnd={props.onLoadingEnd}
       onToggleChange={props.onToggleChange}
       paywalls={localizedPaywalls}
-      platform={
-        props.platform ?? (Platform.OS === "android" ? "android" : "ios")
-      }
+      platform={platform}
       billingAdapter={props.billingAdapter}
       onStartTrial={props.onStartTrial}
       onPurchaseStarted={props.onPurchaseStarted}
@@ -1359,47 +1332,49 @@ function paywallToFlowConfig(paywall: PaywallConfig): RuntimeFlowConfig {
 }
 
 export function SubscriptionPaywall(props: SubscriptionPaywallProps) {
+  const runtimeOptions = useOnbornRuntimeConfig(props);
   const sessionId = useMemo(
     () =>
       `paywall-session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    [props.paywallId],
+    [runtimeOptions.paywallId],
   );
   const runtimeUserId = useMemo(
-    () => props.userId ?? createRuntimeAnonymousUserId("paywall"),
-    [props.userId],
+    () => runtimeOptions.userId ?? createRuntimeAnonymousUserId("paywall"),
+    [runtimeOptions.userId],
   );
   const locale = useMemo(
-    () => resolveRuntimeLocale(props.locale),
-    [props.locale],
+    () => resolveRuntimeLocale(runtimeOptions.locale),
+    [runtimeOptions.locale],
   );
+  const platform =
+    runtimeOptions.platform ?? (Platform.OS === "android" ? "android" : "ios");
   const client = useMemo(
     () =>
-      createClient({
-        apiKey: props.apiKey,
-        flowId: `paywall:${props.paywallId}`,
+      createInternalClient({
+        apiKey: runtimeOptions.apiKey,
+        flowId: `paywall:${runtimeOptions.paywallId}`,
         userId: runtimeUserId,
         locale,
-        appId: props.appId,
-        platform:
-          props.platform ?? (Platform.OS === "android" ? "android" : "ios"),
-        country: props.country,
-        appVersion: props.appVersion,
-        userType: props.userType,
-        sdkVersion: props.sdkVersion,
-        fetchImpl: props.fetchImpl,
+        appId: runtimeOptions.appId,
+        platform,
+        country: runtimeOptions.country,
+        appVersion: runtimeOptions.appVersion,
+        userType: runtimeOptions.userType,
+        sdkVersion: runtimeOptions.sdkVersion,
+        fetchImpl: runtimeOptions.fetchImpl,
       }),
     [
-      props.apiKey,
-      props.appId,
-      props.appVersion,
-      props.country,
-      props.fetchImpl,
+      runtimeOptions.apiKey,
+      runtimeOptions.appId,
+      runtimeOptions.appVersion,
+      runtimeOptions.country,
+      runtimeOptions.fetchImpl,
       locale,
-      props.paywallId,
-      props.platform,
+      runtimeOptions.paywallId,
+      platform,
       runtimeUserId,
-      props.sdkVersion,
-      props.userType,
+      runtimeOptions.sdkVersion,
+      runtimeOptions.userType,
     ],
   );
   useAnalyticsAppStateFlush(client);
@@ -1411,9 +1386,9 @@ export function SubscriptionPaywall(props: SubscriptionPaywallProps) {
     setLoading(true);
     const load = async () => {
       try {
-        const nextResponse = await client.loadPaywall(props.paywallId);
-        const products = props.billingAdapter?.loadProducts
-          ? await loadLocalizedProducts(props.billingAdapter, {
+        const nextResponse = await client.loadPaywall(runtimeOptions.paywallId);
+        const products = runtimeOptions.billingAdapter?.loadProducts
+          ? await loadLocalizedProducts(runtimeOptions.billingAdapter, {
               paywall: nextResponse.paywall,
               offering: nextResponse.offering,
               products: nextResponse.products,
@@ -1438,7 +1413,12 @@ export function SubscriptionPaywall(props: SubscriptionPaywallProps) {
     return () => {
       cancelled = true;
     };
-  }, [client, props.billingAdapter, props.paywallId, runtimeUserId]);
+  }, [
+    client,
+    runtimeOptions.billingAdapter,
+    runtimeOptions.paywallId,
+    runtimeUserId,
+  ]);
 
   if (!response) {
     return (
@@ -1446,7 +1426,7 @@ export function SubscriptionPaywall(props: SubscriptionPaywallProps) {
         InitialLoadingComponent={props.InitialLoadingComponent}
         kind="paywall"
         loading={loading}
-        paywallId={props.paywallId}
+        paywallId={runtimeOptions.paywallId}
       />
     );
   }
@@ -1467,14 +1447,11 @@ export function SubscriptionPaywall(props: SubscriptionPaywallProps) {
         offering: response.offering,
         products: response.products,
         experiment: response.experiment,
-        platform:
-          props.platform ?? (Platform.OS === "android" ? "android" : "ios"),
+        platform,
         presentationMode: "standalone",
       }}
-      platform={
-        props.platform ?? (Platform.OS === "android" ? "android" : "ios")
-      }
-      billingAdapter={props.billingAdapter}
+      platform={platform}
+      billingAdapter={runtimeOptions.billingAdapter}
       onStartTrial={props.onStartTrial}
       onPurchaseStarted={props.onPurchaseStarted}
       onPurchaseCompleted={props.onPurchaseCompleted}

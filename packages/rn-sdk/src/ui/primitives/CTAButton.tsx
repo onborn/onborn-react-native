@@ -110,7 +110,8 @@ export function CTAButton(props: {
                 opacity: props.disabled ? 0.8 : 0.86,
               }
         }
-        style={[
+        style={
+          [
           {
             minHeight: scaleSpace(48),
             borderRadius: radius,
@@ -120,7 +121,8 @@ export function CTAButton(props: {
             opacity: props.disabled ? 0.8 : 1,
           },
           props.style,
-        ]}
+          ] as never
+        }
       >
         {content}
       </Button>

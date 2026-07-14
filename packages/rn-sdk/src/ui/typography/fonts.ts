@@ -95,6 +95,13 @@ import {
   Fraunces_700Bold,
   Fraunces_800ExtraBold,
 } from "@expo-google-fonts/fraunces";
+import {
+  SchibstedGrotesk_400Regular,
+  SchibstedGrotesk_500Medium,
+  SchibstedGrotesk_600SemiBold,
+  SchibstedGrotesk_700Bold,
+  SchibstedGrotesk_800ExtraBold,
+} from "@expo-google-fonts/schibsted-grotesk";
 
 export type OnbornFontFamily =
   | "Inter"
@@ -107,6 +114,7 @@ export type OnbornFontFamily =
   | "Merriweather"
   | "Nunito"
   | "Playfair Display"
+  | "Schibsted Grotesk"
   | "Space Grotesk"
   | "Sora"
   | "Oswald"
@@ -144,6 +152,9 @@ const FONT_FAMILY_ALIASES: Record<string, OnbornFontFamily> = {
   playfairdisplay: "Playfair Display",
   "playfair-display": "Playfair Display",
   "playfair display": "Playfair Display",
+  schibstedgrotesk: "Schibsted Grotesk",
+  "schibsted-grotesk": "Schibsted Grotesk",
+  "schibsted grotesk": "Schibsted Grotesk",
   spacegrotesk: "Space Grotesk",
   "space-grotesk": "Space Grotesk",
   "space grotesk": "Space Grotesk",
@@ -260,6 +271,28 @@ const FONT_ASSETS: Record<OnbornFontFamily, FontWeightAssets> = {
     "800": {
       familyName: "PlayfairDisplay_800ExtraBold",
       source: PlayfairDisplay_800ExtraBold,
+    },
+  },
+  "Schibsted Grotesk": {
+    "400": {
+      familyName: "SchibstedGrotesk_400Regular",
+      source: SchibstedGrotesk_400Regular,
+    },
+    "500": {
+      familyName: "SchibstedGrotesk_500Medium",
+      source: SchibstedGrotesk_500Medium,
+    },
+    "600": {
+      familyName: "SchibstedGrotesk_600SemiBold",
+      source: SchibstedGrotesk_600SemiBold,
+    },
+    "700": {
+      familyName: "SchibstedGrotesk_700Bold",
+      source: SchibstedGrotesk_700Bold,
+    },
+    "800": {
+      familyName: "SchibstedGrotesk_800ExtraBold",
+      source: SchibstedGrotesk_800ExtraBold,
     },
   },
   // Space Grotesk ships up to 700; map 800 to the heaviest available weight.
