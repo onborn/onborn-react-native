@@ -52,9 +52,9 @@ export class BillingClient {
     return parsed.data;
   }
 
-  async loadOffering(offeringId: string): Promise<GetOfferingResponse> {
-    const url = this.runtimeUrl(`/offerings/${encodeURIComponent(offeringId)}`);
-    const payload = await this.getJson(url, `offering '${offeringId}'`);
+  async loadOffering(): Promise<GetOfferingResponse> {
+    const url = this.runtimeUrl("/offerings/current");
+    const payload = await this.getJson(url, "current offering");
     const parsed = GetOfferingResponseSchema.safeParse(payload);
     if (!parsed.success) {
       throw new Error("Invalid offering response payload");

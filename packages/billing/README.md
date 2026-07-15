@@ -36,6 +36,11 @@ function PremiumGate() {
 The package owns the Onborn API URL. Configure credentials and user context
 once through `Onborn.init`; hooks and adapters do not accept an API key.
 
+`useOnbornOffering()` and `BillingClient.loadOffering()` always load the
+offering marked **Current** for the active project and environment. The public
+API accepts no offering ID. Select the current offering in Dashboard → Billing
+before loading a custom paywall.
+
 Installing `@onborn/billing` also installs its analytics and public-contract
 dependencies. You do not need `@onborn/rn-sdk` unless you render Onborn-built
 flows or paywalls.

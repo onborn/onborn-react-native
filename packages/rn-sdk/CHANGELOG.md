@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-beta.3
+
+- Updated `@onborn/billing` to the current-offering API; consumers no longer
+  pass an offering ID when loading headless billing data.
+
 ## 0.1.0-beta.2
 
 - Moved headless offerings, purchases, restores, entitlements, and billing

@@ -19,7 +19,6 @@ import type {
 } from "./types";
 
 export type UseOnbornOfferingOptions = {
-  offeringId: string;
   initialPackageId?: string;
   billingAdapter?: OnbornBillingAdapter;
   onPurchaseStarted?: (item: OnbornPackageWithProduct) => void;
@@ -47,7 +46,7 @@ export type UseOnbornOfferingState = {
 };
 
 export function useOnbornOffering(
-  options: UseOnbornOfferingOptions,
+  options: UseOnbornOfferingOptions = {},
 ): UseOnbornOfferingState {
   const runtimeOptions = useOnbornBillingConfig(options);
   const [data, setData] = useState<GetOfferingResponse | null>(null);
@@ -62,7 +61,7 @@ export function useOnbornOffering(
   const client = useMemo(
     () =>
       createBillingClient({
-        sourceId: `offering:${runtimeOptions.offeringId}`,
+        sourceId: "offering:current",
       }),
     [
       runtimeOptions.apiKey,
@@ -74,7 +73,6 @@ export function useOnbornOffering(
       runtimeOptions.emitSdkConnectionSignal,
       runtimeOptions.fetchImpl,
       runtimeOptions.locale,
-      runtimeOptions.offeringId,
       runtimeOptions.platform,
       runtimeOptions.sdkVersion,
       runtimeOptions.userId,
@@ -102,7 +100,7 @@ export function useOnbornOffering(
     setLoading(true);
     setError(null);
     try {
-      const response = await client.loadOffering(runtimeOptions.offeringId);
+      const response = await client.loadOffering();
       const products = await loadLocalizedProducts(
         runtimeOptions.billingAdapter,
         {
@@ -129,7 +127,6 @@ export function useOnbornOffering(
   }, [
     client,
     runtimeOptions.billingAdapter,
-    runtimeOptions.offeringId,
     runtimeOptions.userId,
   ]);
 

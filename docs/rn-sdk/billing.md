@@ -99,7 +99,6 @@ const billingAdapter = createNativeStoresBillingAdapter({
 
 export function UpgradeScreen() {
   const billing = useOnbornOffering({
-    offeringId: "main-offering",
     billingAdapter,
     onEntitlementsChanged(entitlements) {
       updateLocalAccess(entitlements);
@@ -205,6 +204,11 @@ const entitlements = await client.loadCustomerEntitlements();
 `BillingClient` supports `loadPaywall`, `loadOffering`, `validatePurchase`,
 `restorePurchases`, `loadCustomerEntitlements`, billing event helpers, and
 `flushEvents`.
+
+`loadOffering()` accepts no identifier. It loads only the offering marked
+**Current** in Dashboard → Billing for the API key environment. If no current
+offering is configured, the backend returns
+`current_offering_not_configured` instead of selecting an arbitrary offering.
 
 ## Identity and security
 

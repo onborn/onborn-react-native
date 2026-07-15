@@ -86,8 +86,8 @@ export class ConversionFlowClient {
     return this.billingClient.loadPaywall(paywallId);
   }
 
-  async loadOffering(offeringId: string): Promise<GetOfferingResponse> {
-    return this.billingClient.loadOffering(offeringId);
+  async loadOffering(): Promise<GetOfferingResponse> {
+    return this.billingClient.loadOffering();
   }
 
   async validatePurchase(
