@@ -41,9 +41,14 @@ pnpm add @onborn/rn-sdk
 The SDK owns the Onborn API URL. Apps provide an SDK API key and runtime
 context, not a backend base URL.
 
-`@onborn/rn-sdk` depends on `@onborn/analytics` and
+`@onborn/rn-sdk` depends on `@onborn/billing`, `@onborn/analytics`, and
 `@onborn/sdk-contracts`, so published apps install only `@onborn/rn-sdk` for
 the full subscription flow SDK.
+
+If your app owns its onboarding and paywall UI, install
+`@onborn/billing` instead. It provides offerings, native-store adapters,
+purchase validation, restores, and entitlement hooks without the renderer,
+Tamagui, fonts, or Expo UI dependencies.
 
 ## Initialize once
 
@@ -231,5 +236,6 @@ function InitialLoading({ kind }: InitialLoadingComponentProps) {
 Full GitHub-rendered docs:
 
 - [React Native SDK](../../docs/rn-sdk/rn-sdk.md)
+- [Headless billing](../../docs/rn-sdk/billing.md)
 - [Analytics](../../docs/rn-sdk/analytics.md)
 - [SDK contracts](../../docs/rn-sdk/sdk-contracts.md)

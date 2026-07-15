@@ -1,6 +1,6 @@
 {
   "name": "@onborn/rn-sdk",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "React Native SDK for rendering Onborn onboarding flows and paywalls.",
   "license": "UNLICENSED",
   "repository": {
@@ -52,7 +52,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit",
     "prepack": "yarn build"
@@ -73,7 +73,8 @@
     "@expo-google-fonts/schibsted-grotesk": "^0.4.2",
     "@expo-google-fonts/sora": "^0.4.2",
     "@expo-google-fonts/space-grotesk": "^0.4.1",
-    "@onborn/analytics": "0.1.0-beta.1",
+    "@onborn/analytics": "0.1.0-beta.2",
+    "@onborn/billing": "0.1.0-beta.1",
     "@onborn/sdk-contracts": "0.1.0-beta.1",
     "@react-native-async-storage/async-storage": "^3.0.3",
     "@tamagui/config": "^2.0.0-rc.42",

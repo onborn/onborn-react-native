@@ -1,6 +1,6 @@
 {
   "name": "@onborn/analytics",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Analytics client for Onborn SDKs.",
   "license": "UNLICENSED",
   "repository": {
@@ -33,7 +33,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit",
     "prepack": "yarn build"

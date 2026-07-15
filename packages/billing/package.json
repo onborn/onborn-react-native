@@ -1,12 +1,12 @@
 {
-  "name": "@onborn/sdk-contracts",
+  "name": "@onborn/billing",
   "version": "0.1.0-beta.1",
-  "description": "Runtime-safe contracts used by Onborn client SDKs.",
+  "description": "Headless billing, offerings, purchases, restores, and entitlements for Onborn.",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/onborn/onborn-react-native.git",
-    "directory": "packages/sdk-contracts"
+    "directory": "packages/billing"
   },
   "bugs": {
     "url": "https://github.com/onborn/onborn-react-native/issues"
@@ -16,8 +16,10 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "react-native": "./dist/index.js",
   "exports": {
     ".": {
+      "react-native": "./dist/index.js",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -35,16 +37,25 @@
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "lint": "eslint . --max-warnings 0",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "prepack": "yarn build"
   },
   "dependencies": {
-    "zod": "^3.25.76"
+    "@onborn/analytics": "0.1.0-beta.2",
+    "@onborn/sdk-contracts": "0.1.0-beta.1"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.76.0"
   },
   "devDependencies": {
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@types/node": "^22.15.3",
+    "@types/react": "~19.2.4",
     "eslint": "^9.39.1",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
     "typescript": "5.9.2"
   }
 }

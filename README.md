@@ -17,6 +17,14 @@ without rendering an Onborn flow or paywall.
 
 - [Standalone analytics documentation](docs/rn-sdk/analytics.md)
 
+## Headless Billing
+
+Use `@onborn/billing` when your app owns the onboarding and paywall UI but
+Onborn should manage offerings, purchase validation, restores, and
+entitlements.
+
+- [Headless billing documentation](docs/rn-sdk/billing.md)
+
 ## Example App
 
 The Expo example app lives in `apps/example-expo` and demonstrates:

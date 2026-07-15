@@ -1,7 +1,7 @@
 import { type CustomerEntitlementsResponse } from "@onborn/sdk-contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useOnbornRuntimeConfig } from "../config/Onborn";
-import { createInternalClient } from "../core/client";
+import { createBillingClient } from "./client";
+import { useOnbornBillingConfig } from "./runtime";
 
 export type UseOnbornEntitlementsOptions = {
   autoLoad?: boolean;
@@ -16,29 +16,17 @@ export type UseOnbornEntitlementsState = {
 };
 
 export function useOnbornEntitlements(
-  options: UseOnbornEntitlementsOptions,
+  options: UseOnbornEntitlementsOptions = {},
 ): UseOnbornEntitlementsState {
-  const runtimeOptions = useOnbornRuntimeConfig(options);
+  const runtimeOptions = useOnbornBillingConfig(options);
   const [data, setData] = useState<CustomerEntitlementsResponse | null>(null);
   const [loading, setLoading] = useState(options.autoLoad !== false);
   const [error, setError] = useState<string | null>(null);
 
   const client = useMemo(
     () =>
-      createInternalClient({
-        apiKey: runtimeOptions.apiKey,
-        flowId: "entitlements",
-        userId: runtimeOptions.userId,
-        locale: runtimeOptions.locale,
-        appId: runtimeOptions.appId,
-        platform: runtimeOptions.platform,
-        appVersion: runtimeOptions.appVersion,
-        sdkVersion: runtimeOptions.sdkVersion,
-        fetchImpl: runtimeOptions.fetchImpl,
-        emitAnalyticsEvents: runtimeOptions.emitAnalyticsEvents ?? false,
-        emitSdkConnectionSignal:
-          runtimeOptions.emitSdkConnectionSignal ?? false,
-        autoFlushMs: runtimeOptions.autoFlushMs,
+      createBillingClient({
+        sourceId: "entitlements",
       }),
     [
       runtimeOptions.apiKey,
@@ -59,9 +47,7 @@ export function useOnbornEntitlements(
     setLoading(true);
     setError(null);
     try {
-      const response = await client.loadCustomerEntitlements(
-        runtimeOptions.userId,
-      );
+      const response = await client.loadCustomerEntitlements();
       setData(response);
       return response;
     } catch (loadError) {
@@ -71,7 +57,7 @@ export function useOnbornEntitlements(
     } finally {
       setLoading(false);
     }
-  }, [client, runtimeOptions.userId]);
+  }, [client]);
 
   useEffect(() => {
     if (options.autoLoad === false) {

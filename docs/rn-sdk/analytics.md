@@ -27,7 +27,7 @@ Onborn.init({
   appId: "ios-app",
   platform: "ios",
   appVersion: "1.0.0",
-  sdkVersion: "0.1.0-beta.1",
+  sdkVersion: "0.1.0-beta.2",
 });
 ```
 
@@ -57,7 +57,7 @@ Onborn.init({
   appId: "ios-app",
   platform: "ios",
   appVersion: "1.0.0",
-  sdkVersion: "0.1.0-beta.1",
+  sdkVersion: "0.1.0-beta.2",
   maxAnalyticsBatchSize: 10,
   autoFlushMs: 10_000,
   maxAnalyticsQueueSize: 500,
@@ -216,5 +216,6 @@ application-level user identifiers where possible.
 
 ## Related docs
 
+- [Headless billing](./billing.md)
 - [React Native SDK](./rn-sdk.md)
 - [SDK contracts](./sdk-contracts.md)

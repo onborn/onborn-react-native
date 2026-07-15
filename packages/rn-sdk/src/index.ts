@@ -1,6 +1,11 @@
 export * from "./config/cache";
 export * from "./config/analyticsStorage";
-export * from "./config/Onborn";
+export {
+  Onborn,
+  resolveOnbornRuntimeConfig,
+  useOnbornRuntimeConfig,
+  type OnbornConfig,
+} from "./config/Onborn";
 export * from "./config/templates";
 export * from "./hooks/useSubscriptionFlow";
 export * from "./paywall";

@@ -1999,7 +1999,6 @@ export function SubscriptionFlowInternal(props: SubscriptionFlowInternalProps) {
               offering: basePaywallContext.offering,
               item: selectedPaywallPackage,
               result: adapterResult,
-              userId,
             })
           : adapterResult;
         onPurchaseCompleted?.(result);
@@ -2110,7 +2109,6 @@ export function SubscriptionFlowInternal(props: SubscriptionFlowInternalProps) {
         client,
         offering: effectiveBasePaywallContext?.offering,
         result: adapterResult,
-        userId,
       });
       onRestoreCompleted?.(result);
       notifyEntitlementsChanged(result.entitlements, onEntitlementsChanged);

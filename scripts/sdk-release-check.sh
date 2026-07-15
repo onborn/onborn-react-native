@@ -9,12 +9,14 @@ cd "$ROOT_DIR"
 PACKAGE_DIRS=(
   "packages/sdk-contracts"
   "packages/analytics"
+  "packages/billing"
   "packages/rn-sdk"
 )
 
 BUILD_ORDER=(
   "@onborn/sdk-contracts"
   "@onborn/analytics"
+  "@onborn/billing"
   "@onborn/rn-sdk"
 )
 

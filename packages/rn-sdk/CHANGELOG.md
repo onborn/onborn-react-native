@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-beta.2
+
+- Moved headless offerings, purchases, restores, entitlements, and billing
+  adapters into the lightweight `@onborn/billing` package.
+- Re-exported billing APIs from the full renderer SDK for apps that use Onborn
+  flows or paywalls.
+- Reused the shared billing client inside the flow and paywall renderer.
+
 ## 0.1.0-beta.1
 
 - Unified runtime initialization with `@onborn/analytics` through `Onborn.init`.

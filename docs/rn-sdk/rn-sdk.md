@@ -11,6 +11,9 @@ Primary runtime components:
 - `useOnbornPaywall` for headless/custom paywall runtime.
 - Billing adapters for mock billing, RevenueCat, and custom native-store implementations.
 
+Apps with fully custom onboarding and paywall UI should use the lighter
+[`@onborn/billing`](./billing.md) package instead of installing this renderer.
+
 ## Install package
 
 Yarn:
@@ -286,6 +289,10 @@ For event schemas, metric definitions, and standalone event tracking, see
 ## Billing
 
 The SDK renders paywalls, package selectors, restore buttons, and purchase CTAs. The host app is responsible for providing a billing adapter.
+
+All billing hooks and adapters below are reexported from `@onborn/billing`.
+Use that package directly when your app owns the UI and does not need
+`SubscriptionFlow` or `SubscriptionPaywall`.
 
 ### Mock Billing
 

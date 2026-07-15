@@ -13,6 +13,7 @@ dependency of:
 
 - `@onborn/rn-sdk`
 - `@onborn/analytics`
+- `@onborn/billing`
 
 Install it directly only when you need shared Onborn runtime types:
 
@@ -89,16 +90,17 @@ the public SDK contract.
 
 ## Versioning
 
-`@onborn/sdk-contracts`, `@onborn/analytics`, and `@onborn/rn-sdk` should be
-released together during beta.
+Public packages should be released in dependency order during beta.
 
 Recommended beta publish order:
 
 1. `@onborn/sdk-contracts`
 2. `@onborn/analytics`
-3. `@onborn/rn-sdk`
+3. `@onborn/billing`
+4. `@onborn/rn-sdk`
 
 ## Related docs
 
 - [React Native SDK](./rn-sdk.md)
 - [Analytics](./analytics.md)
+- [Headless billing](./billing.md)

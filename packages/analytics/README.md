@@ -18,7 +18,7 @@ Onborn.init({
   appId: "my-ios-app",
   platform: "ios",
   appVersion: "1.0.0",
-  sdkVersion: "0.1.0-beta.1",
+  sdkVersion: "0.1.0-beta.2",
 });
 
 await Onborn.track({
@@ -40,5 +40,6 @@ context, not a backend URL.
 ## Documentation
 
 - [Analytics docs](../../docs/rn-sdk/analytics.md)
+- [Headless billing docs](../../docs/rn-sdk/billing.md)
 - [React Native SDK docs](../../docs/rn-sdk/rn-sdk.md)
 - [SDK contracts docs](../../docs/rn-sdk/sdk-contracts.md)

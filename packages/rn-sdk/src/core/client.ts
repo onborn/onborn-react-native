@@ -1,6 +1,7 @@
 import {
   type TrackEventInput,
 } from "@onborn/analytics";
+import { BillingClient } from "@onborn/billing";
 import type {
   CustomerEntitlementsResponse,
   FlowConfig,
@@ -13,17 +14,8 @@ import type {
 } from "@onborn/sdk-contracts";
 import { Onborn } from "../config/Onborn";
 import {
-  fetchCustomerEntitlements,
-  fetchOffering,
   fetchFlowConfig,
-  fetchPaywall,
-  restorePurchasesRequest,
-  validatePurchaseRequest,
-  type CustomerEntitlementsFetchOptions,
-  type OfferingFetchOptions,
   type FlowFetchOptions,
-  type PaywallFetchOptions,
-  type PurchaseRequestOptions,
 } from "../config/fetcher";
 import { resolveRuntimeLocale } from "../config/locale";
 
@@ -62,6 +54,7 @@ export class ConversionFlowClient {
   private readonly options: ConversionFlowClientOptions;
   private readonly userId: string;
   private readonly emitAnalyticsEvents: boolean;
+  private readonly billingClient: BillingClient;
   private experimentContext: RuntimeExperimentContext | null = null;
   private sdkConnectionTracked = false;
 
@@ -72,6 +65,9 @@ export class ConversionFlowClient {
     };
     this.userId = options.userId ?? createAnonymousUserId();
     this.emitAnalyticsEvents = options.emitAnalyticsEvents !== false;
+    this.billingClient = new BillingClient({
+      sourceId: this.options.flowId,
+    });
     if (this.emitAnalyticsEvents && options.emitSdkConnectionSignal !== false) {
       // Fire-and-forget: mark SDK connection as soon as client is initialized.
       void this.trackSdkConnectionEstablished();
@@ -87,52 +83,27 @@ export class ConversionFlowClient {
   }
 
   async loadPaywall(paywallId: string): Promise<GetPaywallResponse> {
-    return fetchPaywall(
-      this.paywallFetchOptionsFromConfig(this.options, paywallId),
-    );
+    return this.billingClient.loadPaywall(paywallId);
   }
 
   async loadOffering(offeringId: string): Promise<GetOfferingResponse> {
-    return fetchOffering(
-      this.offeringFetchOptionsFromConfig(this.options, offeringId),
-    );
+    return this.billingClient.loadOffering(offeringId);
   }
 
   async validatePurchase(
-    input: Omit<ValidatePurchaseRequest, "userId"> & {
-      userId?: string;
-    },
+    input: Omit<ValidatePurchaseRequest, "userId">,
   ): Promise<PurchaseValidationResponse> {
-    return validatePurchaseRequest({
-      ...this.purchaseRequestOptionsFromConfig(this.options),
-      payload: {
-        ...input,
-        userId: input.userId ?? this.userId,
-      },
-    });
+    return this.billingClient.validatePurchase(input);
   }
 
   async restorePurchases(
-    input: Omit<RestorePurchasesRequest, "userId"> & {
-      userId?: string;
-    },
+    input: Omit<RestorePurchasesRequest, "userId">,
   ): Promise<PurchaseValidationResponse> {
-    return restorePurchasesRequest({
-      ...this.purchaseRequestOptionsFromConfig(this.options),
-      payload: {
-        ...input,
-        userId: input.userId ?? this.userId,
-      },
-    });
+    return this.billingClient.restorePurchases(input);
   }
 
-  async loadCustomerEntitlements(
-    userId = this.userId,
-  ): Promise<CustomerEntitlementsResponse> {
-    return fetchCustomerEntitlements({
-      ...this.customerEntitlementsFetchOptionsFromConfig(this.options),
-      userId,
-    });
+  async loadCustomerEntitlements(): Promise<CustomerEntitlementsResponse> {
+    return this.billingClient.loadCustomerEntitlements();
   }
 
   async trackFlowStarted(sessionId: string, variant?: string): Promise<void> {
@@ -550,57 +521,6 @@ export class ConversionFlowClient {
       country: options.country,
       appVersion: options.appVersion,
       userType: options.userType,
-      fetchImpl: options.fetchImpl,
-    };
-  }
-
-  private paywallFetchOptionsFromConfig(
-    options: ConversionFlowClientOptions,
-    paywallId: string,
-  ): PaywallFetchOptions {
-    return {
-      paywallId,
-      apiKey: options.apiKey,
-      userId: this.userId,
-      locale: options.locale,
-      platform: options.platform,
-      country: options.country,
-      appVersion: options.appVersion,
-      userType: options.userType,
-      fetchImpl: options.fetchImpl,
-    };
-  }
-
-  private offeringFetchOptionsFromConfig(
-    options: ConversionFlowClientOptions,
-    offeringId: string,
-  ): OfferingFetchOptions {
-    return {
-      offeringId,
-      apiKey: options.apiKey,
-      userId: this.userId,
-      locale: options.locale,
-      platform: options.platform,
-      country: options.country,
-      appVersion: options.appVersion,
-      fetchImpl: options.fetchImpl,
-    };
-  }
-
-  private purchaseRequestOptionsFromConfig(
-    options: ConversionFlowClientOptions,
-  ): PurchaseRequestOptions {
-    return {
-      apiKey: options.apiKey,
-      fetchImpl: options.fetchImpl,
-    };
-  }
-
-  private customerEntitlementsFetchOptionsFromConfig(
-    options: ConversionFlowClientOptions,
-  ): CustomerEntitlementsFetchOptions {
-    return {
-      apiKey: options.apiKey,
       fetchImpl: options.fetchImpl,
     };
   }

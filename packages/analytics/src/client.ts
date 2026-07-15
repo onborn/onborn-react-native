@@ -192,22 +192,26 @@ let globalAnalyticsClient: AnalyticsClient | null = null;
 export const Onborn = {
   init(config: OnbornConfig): void {
     globalAnalyticsClient?.stopAutoFlush();
-    globalOnbornConfig = { ...config };
+    const normalizedConfig = {
+      ...config,
+      userId: config.userId ?? createAnonymousUserId(),
+    };
+    globalOnbornConfig = normalizedConfig;
     globalAnalyticsClient = new AnalyticsClient({
-      apiKey: config.apiKey,
-      appId: config.appId ?? "onborn.app",
-      platform: config.platform ?? inferPlatform(),
-      locale: config.locale,
-      country: config.country,
-      userType: config.userType,
-      appVersion: config.appVersion ?? "0.0.0",
-      sdkVersion: config.sdkVersion ?? "0.1.0",
-      maxBatchSize: config.maxAnalyticsBatchSize,
-      maxQueueSize: config.maxAnalyticsQueueSize,
-      queueKey: config.analyticsQueueKey,
-      autoFlushMs: config.autoFlushMs,
-      storage: config.analyticsStorage,
-      fetchImpl: config.fetchImpl,
+      apiKey: normalizedConfig.apiKey,
+      appId: normalizedConfig.appId ?? "onborn.app",
+      platform: normalizedConfig.platform ?? inferPlatform(),
+      locale: normalizedConfig.locale,
+      country: normalizedConfig.country,
+      userType: normalizedConfig.userType,
+      appVersion: normalizedConfig.appVersion ?? "0.0.0",
+      sdkVersion: normalizedConfig.sdkVersion ?? "0.1.0",
+      maxBatchSize: normalizedConfig.maxAnalyticsBatchSize,
+      maxQueueSize: normalizedConfig.maxAnalyticsQueueSize,
+      queueKey: normalizedConfig.analyticsQueueKey,
+      autoFlushMs: normalizedConfig.autoFlushMs,
+      storage: normalizedConfig.analyticsStorage,
+      fetchImpl: normalizedConfig.fetchImpl,
     });
     globalAnalyticsClient.startAutoFlush();
   },
@@ -246,6 +250,10 @@ export const Onborn = {
     return requireAnalyticsClient().resetQueue();
   },
 };
+
+function createAnonymousUserId(): string {
+  return `anon-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 function requireOnbornConfig(): OnbornConfig {
   if (!globalOnbornConfig) {

@@ -1,5 +1,5 @@
 import type { PaywallConfig } from "@onborn/sdk-contracts";
-import type { ConversionFlowClient } from "../core/client";
+import type { BillingClient } from "./client";
 import type {
   OnbornPackageWithProduct,
   OnbornPurchaseResult,
@@ -7,20 +7,23 @@ import type {
 } from "./types";
 import type { BillingOffering } from "@onborn/sdk-contracts";
 
+export type BillingValidationClient = Pick<
+  BillingClient,
+  "validatePurchase" | "restorePurchases"
+>;
+
 type ValidateBillingPurchaseInput = {
-  client: ConversionFlowClient;
+  client: BillingValidationClient;
   paywall?: PaywallConfig;
   offering: BillingOffering;
   item: OnbornPackageWithProduct;
   result: OnbornPurchaseResult;
-  userId?: string;
 };
 
 type ValidateBillingRestoreInput = {
-  client: ConversionFlowClient;
+  client: BillingValidationClient;
   offering?: BillingOffering;
   result: OnbornRestoreResult;
-  userId?: string;
 };
 
 export async function validateBillingPurchase(
@@ -35,7 +38,6 @@ export async function validateBillingPurchase(
 
   const response = await input.client.validatePurchase({
     idempotencyKey: createPurchaseIdempotencyKey(input),
-    userId: input.userId,
     paywallId: input.paywall?.id,
     offeringId: input.offering.id,
     packageId: input.item.package.id,
@@ -63,7 +65,6 @@ export async function validateBillingRestore(
 ): Promise<OnbornRestoreResult> {
   const response = await input.client.restorePurchases({
     idempotencyKey: createRestoreIdempotencyKey(input),
-    userId: input.userId,
     provider: input.offering?.provider,
     activeEntitlementKeys: input.result.entitlementIds,
     activeProductIds: input.result.activeProductIds,

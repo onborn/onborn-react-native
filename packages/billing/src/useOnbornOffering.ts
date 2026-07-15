@@ -3,8 +3,8 @@ import {
   type GetOfferingResponse,
 } from "@onborn/sdk-contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useOnbornRuntimeConfig } from "../config/Onborn";
-import { createInternalClient } from "../core/client";
+import { createBillingClient } from "./client";
+import { useOnbornBillingConfig } from "./runtime";
 import {
   findPackageWithProduct,
   getPackagesWithProducts,
@@ -49,7 +49,7 @@ export type UseOnbornOfferingState = {
 export function useOnbornOffering(
   options: UseOnbornOfferingOptions,
 ): UseOnbornOfferingState {
-  const runtimeOptions = useOnbornRuntimeConfig(options);
+  const runtimeOptions = useOnbornBillingConfig(options);
   const [data, setData] = useState<GetOfferingResponse | null>(null);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(
     runtimeOptions.initialPackageId ?? null,
@@ -61,22 +61,8 @@ export function useOnbornOffering(
 
   const client = useMemo(
     () =>
-      createInternalClient({
-        apiKey: runtimeOptions.apiKey,
-        flowId: `offering:${runtimeOptions.offeringId}`,
-        userId: runtimeOptions.userId,
-        locale: runtimeOptions.locale,
-        appId: runtimeOptions.appId,
-        platform: runtimeOptions.platform,
-        country: runtimeOptions.country,
-        appVersion: runtimeOptions.appVersion,
-        userType: runtimeOptions.userType,
-        sdkVersion: runtimeOptions.sdkVersion,
-        fetchImpl: runtimeOptions.fetchImpl,
-        emitAnalyticsEvents: runtimeOptions.emitAnalyticsEvents,
-        emitSdkConnectionSignal:
-          runtimeOptions.emitSdkConnectionSignal ?? false,
-        autoFlushMs: runtimeOptions.autoFlushMs,
+      createBillingClient({
+        sourceId: `offering:${runtimeOptions.offeringId}`,
       }),
     [
       runtimeOptions.apiKey,
@@ -184,7 +170,6 @@ export function useOnbornOffering(
               offering: data.offering,
               item,
               result: adapterResult,
-              userId: runtimeOptions.userId,
             })
           : adapterResult;
         runtimeOptions.onPurchaseCompleted?.(result);
@@ -222,7 +207,6 @@ export function useOnbornOffering(
           client,
           offering: data?.offering,
           result: adapterResult,
-          userId: runtimeOptions.userId,
         });
         runtimeOptions.onRestoreCompleted?.(result);
         notifyEntitlementsChanged(
@@ -254,7 +238,6 @@ export function useOnbornOffering(
         client,
         offering: data?.offering,
         result: adapterResult,
-        userId: runtimeOptions.userId,
       });
       notifyEntitlementsChanged(
         result.entitlements,
