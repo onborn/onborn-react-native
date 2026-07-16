@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-beta.3
+
+- `sdkVersion` now defaults to this package's real version instead of a hardcoded `"0.1.0"`. Apps no longer need to pass (and hand-sync) it; a stale hand-passed value used to be reported with every event.
+- Added `Onborn.initAsync`: resolves a **persisted** anonymous user id via `analyticsStorage`. `Onborn.init` generates an in-memory id, so every cold start looked like a new user; `initAsync` keeps one identity per device. Storage failures fall back to an ephemeral id instead of blocking startup.
+- Exported `ONBORN_SDK_VERSION`.
+
 ## 0.1.0-beta.2
 
 - Share one normalized runtime identity across analytics, billing, and the renderer after `Onborn.init`.

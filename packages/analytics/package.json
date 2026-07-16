@@ -1,6 +1,6 @@
 {
   "name": "@onborn/analytics",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "description": "Analytics client for Onborn SDKs.",
   "license": "UNLICENSED",
   "repository": {
@@ -41,7 +41,7 @@
     "prepack": "yarn sync-version && yarn build"
   },
   "dependencies": {
-    "@onborn/sdk-contracts": "0.1.0-beta.1",
+    "@onborn/sdk-contracts": "0.1.0-beta.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {
