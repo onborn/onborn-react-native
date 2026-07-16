@@ -101,6 +101,14 @@ export function useOnbornOffering(
     setError(null);
     try {
       const response = await client.loadOffering();
+      // Store localization is an enhancement, not a precondition. The native
+      // store connection can be cold or briefly unavailable (app resumed,
+      // StoreKit reconnecting), and treating that as fatal blanked an offering
+      // the backend had already returned — the paywall showed a retry button
+      // even though it had everything it needed to render. Fall back to the
+      // synced catalog products instead; `purchasePackage` still goes through
+      // the adapter and surfaces a real error if the store is truly
+      // unreachable.
       const products = await loadLocalizedProducts(
         runtimeOptions.billingAdapter,
         {
@@ -108,7 +116,13 @@ export function useOnbornOffering(
           products: response.products,
           userId: runtimeOptions.userId,
         },
-      );
+      ).catch((productsError: unknown) => {
+        console.warn(
+          "[onborn] Native store products unavailable; showing catalog prices.",
+          productsError,
+        );
+        return response.products;
+      });
       setData({ ...response, products });
       setSelectedPackageId((current) => {
         if (

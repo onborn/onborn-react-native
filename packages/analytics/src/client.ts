@@ -3,8 +3,10 @@ import { buildAnalyticsEvent, type AnalyticsPlatform, type TrackEventInput } fro
 import { flushBatch, type FetchLike } from "./flush";
 import { AnalyticsQueue } from "./queue";
 import { MemoryAnalyticsStorage, type AnalyticsStorage } from "./storage";
+import { ONBORN_SDK_VERSION } from "./version";
 
 const DEFAULT_QUEUE_KEY = "onborn:analytics:queue";
+const ANONYMOUS_USER_ID_KEY = "onborn:anonymous-user-id";
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_MAX_QUEUE_SIZE = 1000;
 const DEFAULT_ONBORN_API_BASE_URL = "https://api.testing.onborn.app";
@@ -190,6 +192,12 @@ let globalOnbornConfig: OnbornConfig | null = null;
 let globalAnalyticsClient: AnalyticsClient | null = null;
 
 export const Onborn = {
+  /**
+   * Synchronous init. When `userId` is omitted an anonymous id is generated in
+   * memory, which means a NEW id on every cold start — fine for a quick spike,
+   * wrong for analytics. Use `initAsync` with `analyticsStorage` to get a
+   * stable anonymous id.
+   */
   init(config: OnbornConfig): void {
     globalAnalyticsClient?.stopAutoFlush();
     const normalizedConfig = {
@@ -205,7 +213,9 @@ export const Onborn = {
       country: normalizedConfig.country,
       userType: normalizedConfig.userType,
       appVersion: normalizedConfig.appVersion ?? "0.0.0",
-      sdkVersion: normalizedConfig.sdkVersion ?? "0.1.0",
+      // The SDK knows its own version; a hand-passed `sdkVersion` silently
+      // drifts from the installed package and poisons telemetry.
+      sdkVersion: normalizedConfig.sdkVersion ?? ONBORN_SDK_VERSION,
       maxBatchSize: normalizedConfig.maxAnalyticsBatchSize,
       maxQueueSize: normalizedConfig.maxAnalyticsQueueSize,
       queueKey: normalizedConfig.analyticsQueueKey,
@@ -214,6 +224,29 @@ export const Onborn = {
       fetchImpl: normalizedConfig.fetchImpl,
     });
     globalAnalyticsClient.startAutoFlush();
+  },
+
+  /**
+   * Init with a stable anonymous user id.
+   *
+   * When `userId` is omitted, the id is read from (or written to)
+   * `analyticsStorage`, so the same device keeps its identity across cold
+   * starts — without it every launch looks like a brand-new user and
+   * retention/conversion numbers are meaningless. Pass your own `userId` once
+   * the customer signs in.
+   *
+   * Storage failures are non-fatal: init always completes, falling back to an
+   * in-memory id.
+   */
+  async initAsync(config: OnbornConfig): Promise<void> {
+    if (config.userId) {
+      Onborn.init(config);
+      return;
+    }
+    Onborn.init({
+      ...config,
+      userId: await resolveAnonymousUserId(config.analyticsStorage),
+    });
   },
 
   getConfig(): OnbornConfig | null {
@@ -253,6 +286,30 @@ export const Onborn = {
 
 function createAnonymousUserId(): string {
   return `anon-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Read the persisted anonymous id, creating and storing one on first run.
+ * Never throws: a storage error degrades to an ephemeral id rather than
+ * blocking SDK startup.
+ */
+async function resolveAnonymousUserId(
+  storage: AnalyticsStorage | undefined,
+): Promise<string> {
+  if (!storage) {
+    return createAnonymousUserId();
+  }
+  try {
+    const stored = await storage.getItem(ANONYMOUS_USER_ID_KEY);
+    if (stored && stored.trim()) {
+      return stored.trim();
+    }
+    const created = createAnonymousUserId();
+    await storage.setItem(ANONYMOUS_USER_ID_KEY, created);
+    return created;
+  } catch {
+    return createAnonymousUserId();
+  }
 }
 
 function requireOnbornConfig(): OnbornConfig {

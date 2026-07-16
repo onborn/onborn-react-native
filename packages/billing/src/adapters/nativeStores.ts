@@ -1,5 +1,7 @@
 import type {
+  BillingPeriod,
   BillingProduct,
+  BillingProductOffer,
   NativeStoreRestoredPurchase,
 } from "@onborn/sdk-contracts";
 import type {
@@ -37,6 +39,10 @@ type NativeStoresProduct = {
   currencyCode?: string;
   period?: string;
   subscriptionPeriod?: string;
+  /** Normalized renewal period, when the adapter can determine it. */
+  billingPeriod?: BillingPeriod;
+  /** Eligibility-checked introductory/promotional offer, when one applies. */
+  introOffer?: BillingProductOffer;
   raw?: unknown;
 };
 
@@ -155,6 +161,10 @@ function localizeProducts(
       title: readString(nativeProduct.title) ?? product.title,
       description: readString(nativeProduct.description) ?? product.description,
       price: readNativePrice(nativeProduct) ?? product.price,
+      // The store gives us the amount as a number; surface it as a first-class
+      // field so apps never have to dig it back out of `metadata.raw`.
+      priceAmount:
+        readPriceAmount(nativeProduct.price) ?? product.priceAmount,
       currency:
         readString(nativeProduct.currencyCode) ??
         readString(nativeProduct.currency) ??
@@ -163,6 +173,8 @@ function localizeProducts(
         readString(nativeProduct.subscriptionPeriod) ??
         readString(nativeProduct.period) ??
         product.period,
+      billingPeriod: nativeProduct.billingPeriod ?? product.billingPeriod,
+      introOffer: nativeProduct.introOffer ?? product.introOffer,
       metadata: {
         ...product.metadata,
         nativeStoreProduct: nativeProduct.raw ?? nativeProduct,
@@ -282,4 +294,20 @@ function readPriceValue(value: unknown): string | undefined {
     return String(value);
   }
   return readString(value);
+}
+
+/**
+ * Stores are inconsistent about the numeric price: StoreKit hands back a
+ * number, some Play/JS bridges stringify it. Accept either, reject anything
+ * that is not a usable amount.
+ */
+function readPriceAmount(value: unknown): number | undefined {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value >= 0 ? value : undefined;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  }
+  return undefined;
 }

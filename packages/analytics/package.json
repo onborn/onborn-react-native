@@ -36,7 +36,9 @@
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit",
-    "prepack": "yarn build"
+    "sync-version": "node scripts/sync-version.mjs",
+    "check-version": "node scripts/sync-version.mjs --check",
+    "prepack": "yarn sync-version && yarn build"
   },
   "dependencies": {
     "@onborn/sdk-contracts": "0.1.0-beta.1",

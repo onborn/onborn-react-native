@@ -2,14 +2,26 @@ import {
   fetchProducts,
   getActiveSubscriptions,
   getAvailablePurchases,
+  initConnection,
+  isEligibleForIntroOfferIOS,
   restorePurchases as synchronizeStorePurchases,
   type ProductSubscription,
   type Purchase,
+  type SubscriptionOffer,
   useIAP,
 } from "expo-iap";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
+import type {
+  BillingPeriod,
+  BillingProductOffer,
+} from "@onborn/sdk-contracts";
 import { createNativeStoresBillingAdapter } from "./adapters/nativeStores";
+import {
+  isUserCancelledError,
+  OnbornPurchaseError,
+  toOnbornPurchaseError,
+} from "./errors";
 import type {
   OnbornBillingAdapter,
   OnbornPurchaseResult,
@@ -57,6 +69,15 @@ export type ExpoIapBillingAdapterOptions = {
   restoreSettleDelayMs?: number;
 };
 
+/**
+ * Lifecycle of the native store connection.
+ *
+ * `connected: false` alone cannot tell "still connecting" from "gave up",
+ * which is the difference between showing a spinner and showing a retry
+ * button — so every app ended up rebuilding this with its own timers.
+ */
+export type ExpoIapConnectionState = "connecting" | "ready" | "unavailable";
+
 export type ExpoIapBillingAdapter = {
   /**
    * Adapter that can be passed to Onborn hooks immediately. Store
@@ -65,6 +86,10 @@ export type ExpoIapBillingAdapter = {
   billingAdapter: OnbornBillingAdapter;
   /** Native store connection state for optional loading and disabled UI. */
   connected: boolean;
+  /** Same signal as `connected`, but distinguishes "connecting" from "gave up". */
+  connectionState: ExpoIapConnectionState;
+  /** Re-attempt a store connection after `connectionState` went unavailable. */
+  retryConnection: () => Promise<void>;
   products: ProductSubscription[];
   loadingProducts: boolean;
   productError: Error | null;
@@ -90,6 +115,9 @@ export function useExpoIapBillingAdapter(
   const productRequestRef = useRef<Promise<ProductSubscription[]> | null>(null);
   const knownProductIdsRef = useRef(new Set(normalizeIds(options.productIds)));
   const [products, setProducts] = useState<ProductSubscription[]>([]);
+  const [connectionState, setConnectionState] =
+    useState<ExpoIapConnectionState>("connecting");
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productError, setProductError] = useState<Error | null>(null);
   const [transactionError, setTransactionError] = useState<Error | null>(null);
@@ -139,12 +167,43 @@ export function useExpoIapBillingAdapter(
     connectedRef.current = connected;
     if (!connected) return;
 
+    setConnectionState("ready");
     for (const waiter of connectionWaitersRef.current) {
       clearTimeout(waiter.timeout);
       waiter.resolve();
     }
     connectionWaitersRef.current.clear();
   }, [connected]);
+
+  // Give up on the same budget store operations use, so the UI can offer a
+  // retry instead of spinning forever.
+  useEffect(() => {
+    if (connected) {
+      return;
+    }
+    setConnectionState("connecting");
+    const timeout = setTimeout(
+      () => setConnectionState("unavailable"),
+      options.connectionTimeoutMs ?? DEFAULT_CONNECTION_TIMEOUT_MS,
+    );
+    return () => clearTimeout(timeout);
+  }, [connected, connectionAttempt, options.connectionTimeoutMs]);
+
+  const retryConnection = useCallback(async (): Promise<void> => {
+    if (connectedRef.current) {
+      return;
+    }
+    setConnectionState("connecting");
+    // Restart the give-up timer even when initConnection resolves instantly;
+    // `connected` only flips once expo-iap's own listener fires.
+    setConnectionAttempt((attempt) => attempt + 1);
+    try {
+      await initConnection();
+    } catch {
+      // Leave the state machine to the timer: a failed attempt is only
+      // "unavailable" once the budget is actually spent.
+    }
+  }, []);
 
   const waitForConnection = useCallback(async (): Promise<void> => {
     if (connectedRef.current) return;
@@ -297,7 +356,10 @@ export function useExpoIapBillingAdapter(
       const nativeAdapter = createNativeStoresBillingAdapter({
         async loadProducts({ storeProductIds }) {
           const nativeProducts = await loadProducts(storeProductIds);
-          return nativeProducts.map(normalizeStoreProduct);
+          const eligibility = await resolveIntroOfferEligibility(nativeProducts);
+          return nativeProducts.map((product) =>
+            normalizeStoreProduct(product, eligibility),
+          );
         },
         async purchaseProduct({ storeProductId }) {
           await waitForConnection();
@@ -343,7 +405,7 @@ export function useExpoIapBillingAdapter(
                   return;
                 }
                 if (item.bufferedError) {
-                  const recovered = isUserCancelled(item.bufferedError)
+                  const recovered = isUserCancelledError(item.bufferedError)
                     ? await recoverPurchase(storeProductId)
                     : null;
                   if (recovered && pendingPurchaseRef.current === item) {
@@ -366,7 +428,7 @@ export function useExpoIapBillingAdapter(
                   );
                   return;
                 }
-                const recovered = isUserCancelled(error)
+                const recovered = isUserCancelledError(error)
                   ? await recoverPurchase(storeProductId)
                   : null;
                 if (recovered && pendingPurchaseRef.current === item) {
@@ -496,6 +558,8 @@ export function useExpoIapBillingAdapter(
   return {
     billingAdapter,
     connected,
+    connectionState,
+    retryConnection,
     products,
     loadingProducts,
     productError,
@@ -529,7 +593,10 @@ async function fetchSubscriptionProductsWithRetry(
   );
 }
 
-function normalizeStoreProduct(product: ProductSubscription) {
+function normalizeStoreProduct(
+  product: ProductSubscription,
+  offerEligibility?: OfferEligibilityLookup,
+) {
   return {
     id: product.id,
     productId: product.id,
@@ -542,7 +609,185 @@ function normalizeStoreProduct(product: ProductSubscription) {
       "subscriptionPeriodUnitIOS" in product
         ? product.subscriptionPeriodUnitIOS ?? undefined
         : undefined,
+    billingPeriod: readProductBillingPeriod(product),
+    introOffer: readProductIntroOffer(product, offerEligibility),
     raw: product,
+  };
+}
+
+/** Eligibility answers keyed by iOS subscription group, resolved up front. */
+type OfferEligibilityLookup = (product: ProductSubscription) => boolean;
+
+function readSubscriptionGroupId(
+  product: ProductSubscription,
+): string | undefined {
+  const groupId = (product as { subscriptionGroupIdIOS?: string | null })
+    .subscriptionGroupIdIOS;
+  return typeof groupId === "string" && groupId.trim() ? groupId : undefined;
+}
+
+/**
+ * Ask the App Store which subscription groups this customer may still claim an
+ * intro offer in. Answers are resolved once per group (not per product, since
+ * a group usually holds several SKUs) and only on iOS: Play already filters
+ * offers by eligibility, so its advertised offers are usable as-is.
+ *
+ * A failed check falls back to "eligible" — the store itself is the final
+ * authority at purchase time, so a hidden offer costs a conversion while a
+ * shown one merely reverts to the standard price.
+ */
+async function resolveIntroOfferEligibility(
+  products: ProductSubscription[],
+): Promise<OfferEligibilityLookup> {
+  if (Platform.OS !== "ios") {
+    return () => true;
+  }
+  const groupIds = new Set(
+    products
+      .filter(
+        (product) =>
+          (product as { subscriptionOffers?: SubscriptionOffer[] | null })
+            .subscriptionOffers?.length,
+      )
+      .map(readSubscriptionGroupId)
+      .filter((groupId): groupId is string => Boolean(groupId)),
+  );
+  if (groupIds.size === 0) {
+    return () => true;
+  }
+  const results = await Promise.all(
+    Array.from(groupIds).map(async (groupId) => {
+      try {
+        return [groupId, await isEligibleForIntroOfferIOS(groupId)] as const;
+      } catch {
+        return [groupId, true] as const;
+      }
+    }),
+  );
+  const eligibilityByGroup = new Map(results);
+  return (product) => {
+    const groupId = readSubscriptionGroupId(product);
+    if (!groupId) {
+      return true;
+    }
+    return eligibilityByGroup.get(groupId) ?? true;
+  };
+}
+
+function toBillingPeriodUnit(
+  unit: string | null | undefined,
+): BillingPeriod["unit"] | undefined {
+  switch (unit?.toLowerCase()) {
+    case "day":
+      return "day";
+    case "week":
+      return "week";
+    case "month":
+      return "month";
+    case "year":
+      return "year";
+    default:
+      // "unknown"/"empty" are real store values; treat them as no period
+      // rather than guessing a unit and corrupting downstream price math.
+      return undefined;
+  }
+}
+
+function readProductBillingPeriod(
+  product: ProductSubscription,
+): BillingPeriod | undefined {
+  const record = product as {
+    subscriptionPeriodUnitIOS?: string | null;
+    subscriptionPeriodNumberIOS?: string | null;
+    subscriptionOffers?: SubscriptionOffer[] | null;
+  };
+  const unit = toBillingPeriodUnit(record.subscriptionPeriodUnitIOS);
+  if (unit) {
+    const count = Number(record.subscriptionPeriodNumberIOS ?? 1);
+    return { unit, count: Number.isFinite(count) && count > 0 ? count : 1 };
+  }
+  // Android reports the renewal period on the base plan's regular offer.
+  for (const offer of record.subscriptionOffers ?? []) {
+    if (offer.type === "introductory" || offer.type === "promotional") {
+      continue;
+    }
+    const period = toBillingPeriod(offer.period);
+    if (period) {
+      return period;
+    }
+  }
+  return undefined;
+}
+
+function toBillingPeriod(
+  period: SubscriptionOffer["period"],
+): BillingPeriod | undefined {
+  const unit = toBillingPeriodUnit(period?.unit);
+  if (!unit) {
+    return undefined;
+  }
+  const count = period?.value ?? 1;
+  return { unit, count: Number.isFinite(count) && count > 0 ? count : 1 };
+}
+
+function toOfferPaymentMode(
+  mode: string | null | undefined,
+): NonNullable<BillingProductOffer["paymentMode"]> {
+  switch (mode?.toLowerCase()) {
+    case "free-trial":
+      return "free_trial";
+    case "pay-as-you-go":
+      return "pay_as_you_go";
+    case "pay-up-front":
+      return "pay_up_front";
+    default:
+      return "unknown";
+  }
+}
+
+/**
+ * Resolve the introductory offer a customer can actually use.
+ *
+ * Both stores advertise offers on the product, but "advertised" is not
+ * "available to this customer": on iOS the App Store only honours an intro
+ * offer once per subscription group, so eligibility must be checked against
+ * that group. Play only returns offers the customer qualifies for, so their
+ * presence is the answer. An offer the customer cannot redeem is omitted
+ * entirely — showing its price would be a lie on the paywall.
+ */
+function readProductIntroOffer(
+  product: ProductSubscription,
+  offerEligibility?: OfferEligibilityLookup,
+): BillingProductOffer | undefined {
+  const offers =
+    (product as { subscriptionOffers?: SubscriptionOffer[] | null })
+      .subscriptionOffers ?? [];
+  const offer =
+    offers.find((item) => item.type === "introductory") ??
+    offers.find((item) => item.type === "promotional");
+  if (!offer) {
+    return undefined;
+  }
+  const eligible = offerEligibility ? offerEligibility(product) : true;
+  if (!eligible) {
+    return undefined;
+  }
+  return {
+    ...(offer.id ? { id: offer.id } : {}),
+    type: offer.type === "promotional" ? "promotional" : "introductory",
+    ...(offer.displayPrice ? { price: offer.displayPrice } : {}),
+    ...(typeof offer.price === "number" && Number.isFinite(offer.price)
+      ? { priceAmount: offer.price }
+      : {}),
+    ...(offer.currency ? { currency: offer.currency } : {}),
+    paymentMode: toOfferPaymentMode(offer.paymentMode),
+    ...(toBillingPeriod(offer.period)
+      ? { period: toBillingPeriod(offer.period) }
+      : {}),
+    ...(typeof offer.periodCount === "number" && offer.periodCount > 0
+      ? { periodCount: offer.periodCount }
+      : {}),
+    eligible: true,
   };
 }
 
@@ -657,20 +902,9 @@ function isPurchase(value: unknown): value is Purchase {
 function normalizePurchaseError(error: {
   message: string;
   code?: string;
-}): Error {
-  const normalized = new Error(error.message) as Error & {
-    code?: string;
-    userCancelled?: boolean;
-  };
-  normalized.code = error.code;
-  normalized.userCancelled = isUserCancelled(error);
-  return normalized;
-}
-
-function isUserCancelled(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const value = error as { code?: unknown; userCancelled?: unknown };
-  return value.userCancelled === true || value.code === "user-cancelled";
+  productId?: string;
+}): OnbornPurchaseError {
+  return toOnbornPurchaseError(error, { productId: error.productId });
 }
 
 function normalizeError(error: unknown, fallback: string): Error {

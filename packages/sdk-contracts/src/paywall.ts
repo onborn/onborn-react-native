@@ -59,6 +59,51 @@ export const BillingProductTypeSchema = z.enum([
   "consumable",
 ]);
 
+export const BillingPeriodUnitSchema = z.enum(["day", "week", "month", "year"]);
+
+/**
+ * A billing period in machine-readable form. `BillingProduct.period` carries
+ * whatever string the store returned (`P1Y`, `one_year`, …), which forces apps
+ * to pattern-match marketing copy to tell plans apart. This is the normalized
+ * form: compare `unit`/`count` instead.
+ */
+export const BillingPeriodSchema = z
+  .object({
+    unit: BillingPeriodUnitSchema,
+    count: z.number().int().positive(),
+  })
+  .strict();
+
+/** An introductory or promotional price the store offers for a product. */
+export const BillingProductOfferSchema = z
+  .object({
+    id: z.string().optional(),
+    type: z.enum(["introductory", "promotional"]),
+    /** Localized, store-formatted offer price for display. */
+    price: z.string().optional(),
+    priceAmount: z.number().nonnegative().optional(),
+    currency: z.string().optional(),
+    /**
+     * How the offer is charged. `free_trial` means the introductory periods
+     * cost nothing — the difference between "7 days free" and "first month
+     * 50% off".
+     */
+    paymentMode: z
+      .enum(["free_trial", "pay_as_you_go", "pay_up_front", "unknown"])
+      .optional(),
+    /** Length of one offer period. */
+    period: BillingPeriodSchema.optional(),
+    /** How many periods the offer runs for. */
+    periodCount: z.number().int().positive().optional(),
+    /**
+     * Whether THIS customer can still use the offer. iOS is authoritative
+     * (checked against the subscription group); on Android the store only
+     * returns offers the customer qualifies for.
+     */
+    eligible: z.boolean(),
+  })
+  .strict();
+
 export const BillingProductSchema = z
   .object({
     id: z.string().min(1),
@@ -70,10 +115,30 @@ export const BillingProductSchema = z
     type: BillingProductTypeSchema,
     title: z.string().optional(),
     description: z.string().optional(),
+    /** Localized, store-formatted price for display (e.g. "29,99 zł"). */
     price: z.string().optional(),
+    /**
+     * The same price as a number, in major currency units. `price` is a
+     * display string, so anything arithmetic (per-week breakdowns, discount
+     * percentages, price comparisons) needs this. Populated by the native
+     * store adapter at runtime; may be absent before store localization.
+     */
+    priceAmount: z.number().nonnegative().optional(),
     currency: z.string().optional(),
+    /** Raw store period string (`P1Y`, `one_year`, …). Prefer `billingPeriod`. */
     period: z.string().optional(),
+    /**
+     * Normalized renewal period. Populated by the store adapter; compare this
+     * instead of pattern-matching `period`/labels.
+     */
+    billingPeriod: BillingPeriodSchema.optional(),
     trialPeriod: z.string().optional(),
+    /**
+     * The best offer available to this customer, already checked for
+     * eligibility. Absent when the store has no offer or the customer has used
+     * theirs.
+     */
+    introOffer: BillingProductOfferSchema.optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
     syncedAt: z.string().optional(),
   })
@@ -357,6 +422,9 @@ export type BillingProvider = z.infer<typeof BillingProviderSchema>;
 export type BillingStore = z.infer<typeof BillingStoreSchema>;
 export type BillingProductType = z.infer<typeof BillingProductTypeSchema>;
 export type BillingProduct = z.infer<typeof BillingProductSchema>;
+export type BillingPeriodUnit = z.infer<typeof BillingPeriodUnitSchema>;
+export type BillingPeriod = z.infer<typeof BillingPeriodSchema>;
+export type BillingProductOffer = z.infer<typeof BillingProductOfferSchema>;
 export type BillingEntitlement = z.infer<typeof BillingEntitlementSchema>;
 export type BillingPackage = z.infer<typeof BillingPackageSchema>;
 export type BillingOffering = z.infer<typeof BillingOfferingSchema>;
