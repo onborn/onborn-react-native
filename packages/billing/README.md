@@ -24,7 +24,8 @@ function PremiumGate() {
 
 function CustomPaywall() {
   const { billingAdapter, connected } = useExpoIapBillingAdapter();
-  // Pass billingAdapter to useOnbornOffering or useOnbornPaywall.
+  // Pass billingAdapter immediately. It waits for the native connection.
+  // `connected` is only useful for optional loading or disabled UI.
   return { billingAdapter, connected };
 }
 ```
@@ -34,6 +35,10 @@ lifecycle: connection callbacks, localized product loading and retries,
 serialized purchases, cancellation recovery, StoreKit restore synchronization,
 server validation hand-off, and transaction finishing. Host apps keep only
 their paywall UI and entitlement-driven navigation.
+
+Always pass the returned `billingAdapter` directly to `useOnbornOffering` or
+`useOnbornPaywall`. Do not replace it with `undefined` while `connected` is
+false; native operations already wait for the store connection internally.
 
 The package owns the Onborn API URL. Configure credentials and user context
 once through `Onborn.init`; hooks and adapters do not accept an API key.

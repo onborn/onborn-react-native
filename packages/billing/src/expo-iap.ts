@@ -58,7 +58,12 @@ export type ExpoIapBillingAdapterOptions = {
 };
 
 export type ExpoIapBillingAdapter = {
+  /**
+   * Adapter that can be passed to Onborn hooks immediately. Store
+   * operations wait for the native IAP connection internally.
+   */
   billingAdapter: OnbornBillingAdapter;
+  /** Native store connection state for optional loading and disabled UI. */
   connected: boolean;
   products: ProductSubscription[];
   loadingProducts: boolean;
@@ -72,6 +77,8 @@ export type ExpoIapBillingAdapter = {
  *
  * Owns store connection state, serialized purchase callbacks, product caching,
  * restore synchronization, transaction recovery, and post-validation finishing.
+ * Pass `billingAdapter` to Onborn hooks unconditionally; use `connected` only
+ * when the host app wants to present store-connection UI.
  */
 export function useExpoIapBillingAdapter(
   options: ExpoIapBillingAdapterOptions = {},

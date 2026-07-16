@@ -85,9 +85,10 @@ import { useOnbornOffering } from "@onborn/billing";
 import { useExpoIapBillingAdapter } from "@onborn/billing/expo-iap";
 
 export function UpgradeScreen() {
-  const store = useExpoIapBillingAdapter();
+  const { billingAdapter, connected, productError } =
+    useExpoIapBillingAdapter();
   const billing = useOnbornOffering({
-    billingAdapter: store.billingAdapter,
+    billingAdapter,
     onEntitlementsChanged(entitlements) {
       updateLocalAccess(entitlements);
     },
@@ -100,12 +101,17 @@ export function UpgradeScreen() {
       onSelectPackage={billing.selectPackage}
       onPurchase={() => billing.purchasePackage()}
       onRestore={billing.restorePurchases}
-      loading={!store.connected || billing.loading || billing.purchasing}
-      error={billing.error ?? store.productError?.message ?? null}
+      loading={!connected || billing.loading || billing.purchasing}
+      error={billing.error ?? productError?.message ?? null}
     />
   );
 }
 ```
+
+Pass `billingAdapter` immediately. The official adapter waits for the Expo IAP
+connection inside product, purchase, and restore operations. Use `connected`
+only to present optional loading or disabled UI; do not conditionally replace
+the adapter with `undefined`.
 
 The adapter reads store product identifiers from the current Onborn offering.
 Use `productIds` only for additional app-specific SKUs that are not part of
