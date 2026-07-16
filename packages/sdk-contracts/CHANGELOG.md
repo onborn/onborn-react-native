@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-beta.2
+
+- Increased the accepted App Store signed transaction token size for purchase validation and restore payloads.
+
 ## 0.1.0-beta.0
 
 Initial beta release candidate.

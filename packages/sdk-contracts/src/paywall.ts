@@ -304,7 +304,7 @@ export const ValidatePurchaseRequestSchema = z
     provider: BillingProviderSchema,
     store: BillingStoreSchema,
     transactionId: z.string().trim().min(1).max(500).optional(),
-    purchaseToken: z.string().trim().min(1).max(4000).optional(),
+    purchaseToken: z.string().trim().min(1).max(64_000).optional(),
     receipt: z.string().trim().min(1).max(20000).optional(),
     raw: z.unknown().optional(),
   })
@@ -315,7 +315,7 @@ export const NativeStoreRestoredPurchaseSchema = z
     store: z.enum(["app_store", "google_play"]),
     storeProductId: z.string().trim().min(1).max(500),
     transactionId: z.string().trim().min(1).max(500).optional(),
-    purchaseToken: z.string().trim().min(1).max(4000).optional(),
+    purchaseToken: z.string().trim().min(1).max(64_000).optional(),
     raw: z.unknown().optional(),
   })
   .strict();
