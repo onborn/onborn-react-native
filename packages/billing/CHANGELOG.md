@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-beta.5
+
+- Wait for the native store connection before loading localized products,
+  purchasing, or restoring. This prevents a cold-open paywall from showing an
+  unavailable state that only clears after a manual retry.
+
 ## 0.1.0-beta.4
 
 - Surface native store product-loading failures instead of silently falling

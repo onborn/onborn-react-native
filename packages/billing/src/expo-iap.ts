@@ -17,6 +17,7 @@ import type {
 } from "./types";
 
 const DEFAULT_PURCHASE_TIMEOUT_MS = 2 * 60 * 1000;
+const DEFAULT_CONNECTION_TIMEOUT_MS = 15_000;
 const DEFAULT_RECOVERY_DELAY_MS = 750;
 const DEFAULT_PRODUCT_CACHE_MS = 10_000;
 const DEFAULT_PRODUCT_RETRY_DELAY_MS = 500;
@@ -37,9 +38,17 @@ type ProductCache = {
   fetchedAt: number;
 };
 
+type ConnectionWaiter = {
+  resolve: () => void;
+  reject: (error: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
 export type ExpoIapBillingAdapterOptions = {
   /** Additional subscription SKUs that should share the adapter product cache. */
   productIds?: string[];
+  /** Maximum time an operation waits for the native store connection. */
+  connectionTimeoutMs?: number;
   purchaseTimeoutMs?: number;
   purchaseRecoveryDelayMs?: number;
   productCacheMs?: number;
@@ -68,6 +77,8 @@ export function useExpoIapBillingAdapter(
   options: ExpoIapBillingAdapterOptions = {},
 ): ExpoIapBillingAdapter {
   const pendingPurchaseRef = useRef<PendingPurchase | null>(null);
+  const connectedRef = useRef(false);
+  const connectionWaitersRef = useRef(new Set<ConnectionWaiter>());
   const productCacheRef = useRef<ProductCache | null>(null);
   const productRequestRef = useRef<Promise<ProductSubscription[]> | null>(null);
   const knownProductIdsRef = useRef(new Set(normalizeIds(options.productIds)));
@@ -117,11 +128,51 @@ export function useExpoIapBillingAdapter(
     },
   });
 
+  useEffect(() => {
+    connectedRef.current = connected;
+    if (!connected) return;
+
+    for (const waiter of connectionWaitersRef.current) {
+      clearTimeout(waiter.timeout);
+      waiter.resolve();
+    }
+    connectionWaitersRef.current.clear();
+  }, [connected]);
+
+  const waitForConnection = useCallback(async (): Promise<void> => {
+    if (connectedRef.current) return;
+
+    await new Promise<void>((resolve, reject) => {
+      const waiter: ConnectionWaiter = {
+        resolve,
+        reject,
+        timeout: setTimeout(() => {
+          connectionWaitersRef.current.delete(waiter);
+          reject(new Error("Native store connection timed out."));
+        }, options.connectionTimeoutMs ?? DEFAULT_CONNECTION_TIMEOUT_MS),
+      };
+      connectionWaitersRef.current.add(waiter);
+
+      // The connection may have completed between the first check and
+      // registering this waiter.
+      if (connectedRef.current) {
+        connectionWaitersRef.current.delete(waiter);
+        clearTimeout(waiter.timeout);
+        resolve();
+      }
+    });
+  }, [options.connectionTimeoutMs]);
+
   useEffect(
     () => () => {
       settlePendingPurchase((item) =>
         item.reject(new Error("Purchase interrupted.")),
       );
+      for (const waiter of connectionWaitersRef.current) {
+        clearTimeout(waiter.timeout);
+        waiter.reject(new Error("Native store connection was interrupted."));
+      }
+      connectionWaitersRef.current.clear();
     },
     [settlePendingPurchase],
   );
@@ -131,9 +182,7 @@ export function useExpoIapBillingAdapter(
       requestedProductIds: string[],
       force = false,
     ): Promise<ProductSubscription[]> => {
-      if (!connected) {
-        throw new Error("Native store is not connected.");
-      }
+      await waitForConnection();
 
       const requestedIds = normalizeIds(requestedProductIds);
       for (const productId of requestedIds) {
@@ -202,10 +251,10 @@ export function useExpoIapBillingAdapter(
       return matches;
     },
     [
-      connected,
       options.productCacheMs,
       options.productRetryCount,
       options.productRetryDelayMs,
+      waitForConnection,
     ],
   );
 
@@ -244,9 +293,7 @@ export function useExpoIapBillingAdapter(
           return nativeProducts.map(normalizeStoreProduct);
         },
         async purchaseProduct({ storeProductId }) {
-          if (!connected) {
-            throw new Error("Native store is not connected.");
-          }
+          await waitForConnection();
           if (pendingPurchaseRef.current) {
             throw new Error("Another purchase is already in progress.");
           }
@@ -333,9 +380,7 @@ export function useExpoIapBillingAdapter(
           return normalizeStorePurchase(purchase);
         },
         async restorePurchases({ products: configuredProducts }) {
-          if (!connected) {
-            throw new Error("Native store is not connected.");
-          }
+          await waitForConnection();
           const subscriptionIds = normalizeIds([
             ...configuredProducts.map((product) => product.storeProductId),
             ...knownProductIdsRef.current,
@@ -430,7 +475,6 @@ export function useExpoIapBillingAdapter(
       } satisfies OnbornBillingAdapter;
     },
     [
-      connected,
       finishTransaction,
       loadProducts,
       options.purchaseTimeoutMs,
@@ -438,6 +482,7 @@ export function useExpoIapBillingAdapter(
       recoverPurchase,
       requestPurchase,
       settlePendingPurchase,
+      waitForConnection,
     ],
   );
 
