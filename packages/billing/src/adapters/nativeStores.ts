@@ -12,6 +12,7 @@ import type {
 } from "../types";
 
 type NativeStoresPurchase = {
+  id?: string;
   productId?: string;
   storeProductId?: string;
   transactionId?: string;
@@ -249,6 +250,7 @@ function normalizeNativeRestoredPurchase(
     storeProductId,
     transactionId:
       readString(record.transactionId) ??
+      readString(record.id) ??
       readString(record.originalTransactionIdentifierIOS),
     purchaseToken: readString(record.purchaseToken),
     raw: record.raw ?? value,
@@ -260,7 +262,7 @@ function readTransactionId(
 ): string | undefined {
   return (
     purchase?.transactionId ??
-    purchase?.purchaseToken ??
+    purchase?.id ??
     purchase?.originalTransactionIdentifierIOS
   );
 }

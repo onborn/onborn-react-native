@@ -23,6 +23,17 @@ export type BillingClientOptions = {
   sourceId?: string;
 };
 
+export class OnbornBillingRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = "OnbornBillingRequestError";
+  }
+}
+
 type BillingTrackInput = TrackEventInput extends infer Event
   ? Event extends unknown
     ? Omit<Event, "flowId" | "userId">
@@ -178,7 +189,12 @@ export class BillingClient {
       body: JSON.stringify(payload),
     });
     if (!response.ok) {
-      throw new Error(`Purchase request failed (${response.status})`);
+      const failure = await readBillingFailure(response);
+      throw new OnbornBillingRequestError(
+        failure.message ?? `Purchase request failed (${response.status})`,
+        response.status,
+        failure.code,
+      );
     }
     const parsed = PurchaseValidationResponseSchema.safeParse(
       await response.json(),
@@ -202,6 +218,25 @@ export class BillingClient {
       flowId: this.options.sourceId ?? "billing",
       userId: this.userId,
     } as TrackEventInput);
+  }
+}
+
+async function readBillingFailure(
+  response: Response,
+): Promise<{ message?: string; code?: string }> {
+  try {
+    const payload = (await response.json()) as Record<string, unknown>;
+    return {
+      message:
+        typeof payload.error === "string"
+          ? payload.error
+          : typeof payload.message === "string"
+            ? payload.message
+            : undefined,
+      code: typeof payload.code === "string" ? payload.code : undefined,
+    };
+  } catch {
+    return {};
   }
 }
 

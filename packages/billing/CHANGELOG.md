@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-beta.3
+
+- Fixed StoreKit 2 purchases incorrectly using the signed transaction JWS as
+  the transaction identifier.
+- Bounded purchase idempotency keys when only a signed purchase token is
+  available.
+- Added structured billing request errors with backend messages and codes.
+
 ## 0.1.0-beta.2
 
 - Removed `offeringId` from `useOnbornOffering` and
