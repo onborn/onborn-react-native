@@ -11,12 +11,13 @@ catalog entries for any offering or paywall you load.
 ## Install
 
 ```sh
-yarn add @onborn/billing
+yarn add @onborn/billing expo-iap
 ```
 
 The package installs `@onborn/analytics` and `@onborn/sdk-contracts` as
-dependencies. Add a native purchase library such as `expo-iap` or
-`react-native-iap` separately.
+dependencies. `expo-iap` is an optional peer dependency used by the official
+Expo adapter. It requires an Expo development build; Expo Go does not include
+the native purchase module.
 
 ## Initialize once
 
@@ -80,26 +81,13 @@ export function PremiumGate() {
 ## Load an offering for custom UI
 
 ```tsx
-import {
-  createNativeStoresBillingAdapter,
-  useOnbornOffering,
-} from "@onborn/billing";
-
-const billingAdapter = createNativeStoresBillingAdapter({
-  async loadProducts({ storeProductIds }) {
-    return loadProductsFromStore(storeProductIds);
-  },
-  async purchaseProduct({ storeProductId }) {
-    return purchaseFromStore(storeProductId);
-  },
-  async restorePurchases() {
-    return restoreFromStore();
-  },
-});
+import { useOnbornOffering } from "@onborn/billing";
+import { useExpoIapBillingAdapter } from "@onborn/billing/expo-iap";
 
 export function UpgradeScreen() {
+  const store = useExpoIapBillingAdapter();
   const billing = useOnbornOffering({
-    billingAdapter,
+    billingAdapter: store.billingAdapter,
     onEntitlementsChanged(entitlements) {
       updateLocalAccess(entitlements);
     },
@@ -112,11 +100,28 @@ export function UpgradeScreen() {
       onSelectPackage={billing.selectPackage}
       onPurchase={() => billing.purchasePackage()}
       onRestore={billing.restorePurchases}
-      loading={billing.loading || billing.purchasing}
+      loading={!store.connected || billing.loading || billing.purchasing}
+      error={billing.error ?? store.productError?.message ?? null}
     />
   );
 }
 ```
+
+The adapter reads store product identifiers from the current Onborn offering.
+Use `productIds` only for additional app-specific SKUs that are not part of
+that offering.
+
+```tsx
+const store = useExpoIapBillingAdapter({
+  productIds: ["com.example.special_offer"],
+});
+```
+
+After a native purchase, `useOnbornOffering` sends store evidence to Onborn,
+waits for server validation, updates entitlements, and asks the adapter to
+finish the transaction. Restore follows the same order: synchronize StoreKit
+or Google Play, reconcile with Onborn, then finish restored transactions. The
+host app must not call `finishTransaction` itself.
 
 ## Load a configured paywall without rendering it
 
@@ -163,6 +168,8 @@ Billing, `expo-iap`, `react-native-iap`, or a custom native purchase module.
 | `loadProducts` | No | Returns localized product title, description, price, currency, and period. |
 | `purchaseProduct` | Yes | Opens the native purchase sheet and returns transaction evidence. |
 | `restorePurchases` | For restore UI | Returns restored App Store or Google Play purchases. |
+| `finalizePurchase` | No | Finishes a purchase after Onborn validates it. The official Expo adapter implements this automatically. |
+| `finalizeRestore` | No | Finishes restored transactions after Onborn reconciliation. The official Expo adapter implements this automatically. |
 | `refetchCustomerEntitlements` | No | Optional host-side refresh before Onborn entitlement reload. |
 
 Return transaction identifiers, purchase tokens, receipts, and raw store data

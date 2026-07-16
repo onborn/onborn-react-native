@@ -7,11 +7,8 @@ restore validation, and entitlement state without installing the Onborn UI
 renderer.
 
 ```ts
-import {
-  Onborn,
-  createNativeStoresBillingAdapter,
-  useOnbornEntitlements,
-} from "@onborn/billing";
+import { Onborn, useOnbornEntitlements } from "@onborn/billing";
+import { useExpoIapBillingAdapter } from "@onborn/billing/expo-iap";
 
 Onborn.init({
   apiKey: "onborn_test_...",
@@ -20,18 +17,23 @@ Onborn.init({
   platform: "ios",
 });
 
-const billingAdapter = createNativeStoresBillingAdapter({
-  purchaseProduct: async ({ storeProductId }) => {
-    // Call expo-iap, react-native-iap, or your native purchase module.
-    return { productId: storeProductId };
-  },
-});
-
 function PremiumGate() {
   const { hasEntitlement, loading } = useOnbornEntitlements();
   return { loading, premium: hasEntitlement("premium") };
 }
+
+function CustomPaywall() {
+  const { billingAdapter, connected } = useExpoIapBillingAdapter();
+  // Pass billingAdapter to useOnbornOffering or useOnbornPaywall.
+  return { billingAdapter, connected };
+}
 ```
+
+The optional `@onborn/billing/expo-iap` adapter owns the complete native-store
+lifecycle: connection callbacks, localized product loading and retries,
+serialized purchases, cancellation recovery, StoreKit restore synchronization,
+server validation hand-off, and transaction finishing. Host apps keep only
+their paywall UI and entitlement-driven navigation.
 
 The package owns the Onborn API URL. Configure credentials and user context
 once through `Onborn.init`; hooks and adapters do not accept an API key.
@@ -44,6 +46,10 @@ before loading a custom paywall.
 Installing `@onborn/billing` also installs its analytics and public-contract
 dependencies. You do not need `@onborn/rn-sdk` unless you render Onborn-built
 flows or paywalls.
+
+Expo apps using the official adapter must also install the optional peer
+dependency `expo-iap` and use an Expo development build. Expo Go does not
+contain this native module.
 
 `@onborn/rn-sdk` re-exports this package for apps that render Onborn flows.
 

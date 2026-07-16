@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-beta.4
+
+- Surface native store product-loading failures instead of silently falling
+  back to backend catalog metadata without localized store prices.
+- Add the optional `@onborn/billing/expo-iap` adapter with product caching,
+  serialized purchases, StoreKit restore synchronization, transaction recovery,
+  and automatic purchase/restore transaction finishing after Onborn server
+  validation.
+
 ## 0.1.0-beta.3
 
 - Fixed StoreKit 2 purchases incorrectly using the signed transaction JWS as

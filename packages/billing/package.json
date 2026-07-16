@@ -1,6 +1,6 @@
 {
   "name": "@onborn/billing",
-  "version": "0.1.0-beta.3",
+  "version": "0.1.0-beta.4",
   "description": "Headless billing, offerings, purchases, restores, and entitlements for Onborn.",
   "license": "UNLICENSED",
   "repository": {
@@ -22,6 +22,11 @@
       "react-native": "./dist/index.js",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./expo-iap": {
+      "react-native": "./dist/expo-iap.js",
+      "types": "./dist/expo-iap.d.ts",
+      "default": "./dist/expo-iap.js"
     }
   },
   "files": [
@@ -45,8 +50,14 @@
     "@onborn/sdk-contracts": "0.1.0-beta.1"
   },
   "peerDependencies": {
+    "expo-iap": ">=4.5.0",
     "react": ">=18.0.0",
     "react-native": ">=0.76.0"
+  },
+  "peerDependenciesMeta": {
+    "expo-iap": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@repo/eslint-config": "*",
@@ -54,6 +65,7 @@
     "@types/node": "^22.15.3",
     "@types/react": "~19.2.4",
     "eslint": "^9.39.1",
+    "expo-iap": "4.5.0",
     "react": "19.2.3",
     "react-native": "0.86.0",
     "typescript": "5.9.2"

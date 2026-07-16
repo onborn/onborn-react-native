@@ -229,6 +229,7 @@ export function useOnbornPaywall(
               result: adapterResult,
             })
           : adapterResult;
+        await finalizePurchase(runtimeOptions.billingAdapter, result);
         runtimeOptions.onPurchaseCompleted?.(result);
         notifyEntitlementsChanged(
           result.entitlements,
@@ -323,6 +324,7 @@ export function useOnbornPaywall(
           offering: data?.offering,
           result: adapterResult,
         });
+        await finalizeRestore(runtimeOptions.billingAdapter, result);
         runtimeOptions.onRestoreCompleted?.(result);
         notifyEntitlementsChanged(
           result.entitlements,
@@ -447,11 +449,7 @@ async function loadLocalizedProducts(
   if (!billingAdapter?.loadProducts) {
     return input.products;
   }
-  try {
-    return await billingAdapter.loadProducts(input);
-  } catch {
-    return input.products;
-  }
+  return billingAdapter.loadProducts(input);
 }
 
 function notifyEntitlementsChanged(
@@ -462,4 +460,20 @@ function notifyEntitlementsChanged(
     return;
   }
   callback?.(entitlements);
+}
+
+async function finalizePurchase(
+  adapter: OnbornBillingAdapter,
+  result: OnbornPurchaseResult,
+): Promise<void> {
+  if (!result.success || result.status !== "validated") return;
+  await adapter.finalizePurchase?.(result);
+}
+
+async function finalizeRestore(
+  adapter: OnbornBillingAdapter,
+  result: OnbornRestoreResult,
+): Promise<void> {
+  if (!result.success || result.status !== "validated") return;
+  await adapter.finalizeRestore?.(result);
 }

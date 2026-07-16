@@ -63,6 +63,8 @@ export type NativeStoresBillingAdapterOptions = {
   restorePurchases?: (
     input: OnbornRestoreInput,
   ) => Promise<NativeStoresRestoreOutput>;
+  finalizePurchase?: (result: OnbornPurchaseResult) => Promise<void>;
+  finalizeRestore?: (result: OnbornRestoreResult) => Promise<void>;
   refetchCustomerEntitlements?: (input: {
     userId?: string;
   }) => Promise<unknown>;
@@ -127,6 +129,8 @@ export function createNativeStoresBillingAdapter(
         raw: normalized.raw,
       };
     },
+    finalizePurchase: options.finalizePurchase,
+    finalizeRestore: options.finalizeRestore,
     async refetchCustomerEntitlements(input): Promise<OnbornRestoreResult> {
       const result = await options.refetchCustomerEntitlements?.(input);
       return {

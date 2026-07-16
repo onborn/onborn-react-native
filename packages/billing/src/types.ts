@@ -72,9 +72,16 @@ export type OnbornBillingAdapter = {
   purchasePackage: (
     input: OnbornPurchaseInput,
   ) => Promise<OnbornPurchaseResult>;
+  /**
+   * Completes a native transaction after Onborn validates it. Implementations
+   * should be idempotent because unfinished store transactions may be replayed.
+   */
+  finalizePurchase?: (result: OnbornPurchaseResult) => Promise<void>;
   restorePurchases?: (
     input: OnbornRestoreInput,
   ) => Promise<OnbornRestoreResult>;
+  /** Completes restored native transactions after Onborn reconciles them. */
+  finalizeRestore?: (result: OnbornRestoreResult) => Promise<void>;
   refetchCustomerEntitlements?: (input: {
     userId?: string;
   }) => Promise<OnbornRestoreResult>;
