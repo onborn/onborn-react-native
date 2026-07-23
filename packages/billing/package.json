@@ -1,6 +1,6 @@
 {
   "name": "@onborn/billing",
-  "version": "0.1.0-beta.6",
+  "version": "0.1.0-beta.7",
   "description": "Headless billing, offerings, purchases, restores, and entitlements for Onborn.",
   "license": "UNLICENSED",
   "repository": {

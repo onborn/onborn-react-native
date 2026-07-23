@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-beta.7
+
+- `useOnbornEntitlements`: a stale in-flight `reload()` (e.g. the pre-purchase fetch fired at mount) can no longer overwrite a newer post-purchase reload. A request-sequence guard applies only the most recent response, so a just-purchased customer is never flipped back to locked when an older request resolves late.
+
 ## 0.1.0-beta.6
 
 - Added `OnbornPurchaseError` with a normalized `code` (`user_cancelled`, `already_owned`, `store_unavailable`, `network_error`, `product_unavailable`, `pending`, `validation_failed`, `not_allowed`, `unknown`), plus `isUserCancelledError` and `toOnbornPurchaseError`. Apps no longer sniff raw store error shapes to tell a cancelled purchase from a real failure.

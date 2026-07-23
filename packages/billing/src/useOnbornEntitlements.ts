@@ -40,6 +40,10 @@ export function useOnbornEntitlements(
   const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const freshRef = useRef(false);
+  // Monotonic id of the latest reload. A response only wins if it is still the
+  // most recent request — so an in-flight fetch started BEFORE a purchase can
+  // never overwrite the fetch fired AFTER it, whatever order they resolve in.
+  const requestSeqRef = useRef(0);
 
   const client = useMemo(
     () =>
@@ -70,10 +74,17 @@ export function useOnbornEntitlements(
   const storage = options.cache ? runtimeOptions.analyticsStorage : undefined;
 
   const reload = useCallback(async (): Promise<CustomerEntitlementsResponse> => {
+    const seq = (requestSeqRef.current += 1);
     setLoading(true);
     setError(null);
     try {
       const response = await client.loadCustomerEntitlements();
+      // Superseded by a newer reload while this one was in flight: return the
+      // value to this specific caller but do not let it become the shared
+      // state, so a pre-purchase read can't clobber a post-purchase one.
+      if (seq !== requestSeqRef.current) {
+        return response;
+      }
       freshRef.current = true;
       setData(response);
       setStale(false);
@@ -84,11 +95,14 @@ export function useOnbornEntitlements(
       }
       return response;
     } catch (loadError) {
-      const message = toError(loadError).message;
-      setError(message);
+      if (seq === requestSeqRef.current) {
+        setError(toError(loadError).message);
+      }
       throw loadError;
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) {
+        setLoading(false);
+      }
     }
   }, [cacheKey, client, storage]);
 
