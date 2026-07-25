@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-beta.8
+
+- Paywall events now report the loaded paywall's name as the required `flowName`, with an
+  optional `paywallName` client option as the fallback.
+
 ## 0.1.0-beta.7
 
 - `useOnbornEntitlements`: a stale in-flight `reload()` (e.g. the pre-purchase fetch fired at mount) can no longer overwrite a newer post-purchase reload. A request-sequence guard applies only the most recent response, so a just-purchased customer is never flipped back to locked when an older request resolves late.

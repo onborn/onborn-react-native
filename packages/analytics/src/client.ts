@@ -13,6 +13,14 @@ const DEFAULT_ONBORN_API_BASE_URL = "https://api.testing.onborn.app";
 
 export type OnbornConfig = {
   apiKey: string;
+  /**
+   * Name of your onboarding flow, reported with every step/flow event. Required
+   * unless the event carries its own `flowName` (the React Native SDK fills it
+   * from the published flow).
+   */
+  onboardingFlowName?: string;
+  /** Name of your paywall, reported with every `paywall_*` event. */
+  paywallName?: string;
   userId?: string;
   appId?: string;
   platform?: AnalyticsPlatform;
@@ -33,6 +41,8 @@ export type OnbornConfig = {
 
 type AnalyticsClientOptions = {
   apiKey: string;
+  onboardingFlowName?: string;
+  paywallName?: string;
   appId: string;
   platform: AnalyticsPlatform;
   locale?: string;
@@ -75,6 +85,8 @@ class AnalyticsClient {
     userType?: "new" | "returning";
     appVersion: string;
     sdkVersion: string;
+    onboardingFlowName?: string;
+    paywallName?: string;
   };
   private autoFlushTimer: ReturnType<typeof setInterval> | null = null;
   private isFlushing = false;
@@ -91,6 +103,8 @@ class AnalyticsClient {
       userType: options.userType,
       appVersion: options.appVersion,
       sdkVersion: options.sdkVersion,
+      onboardingFlowName: options.onboardingFlowName,
+      paywallName: options.paywallName,
     };
 
     this.queue = new AnalyticsQueue(
@@ -207,6 +221,8 @@ export const Onborn = {
     globalOnbornConfig = normalizedConfig;
     globalAnalyticsClient = new AnalyticsClient({
       apiKey: normalizedConfig.apiKey,
+      onboardingFlowName: normalizedConfig.onboardingFlowName,
+      paywallName: normalizedConfig.paywallName,
       appId: normalizedConfig.appId ?? "onborn.app",
       platform: normalizedConfig.platform ?? inferPlatform(),
       locale: normalizedConfig.locale,

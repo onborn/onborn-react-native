@@ -11,7 +11,8 @@ type CommonEventFields =
   | "country"
   | "userType"
   | "appVersion"
-  | "sdkVersion";
+  | "sdkVersion"
+  | "flowName";
 
 type AnalyticsEventWithoutCommon<T extends AnalyticsEvent["type"]> = Omit<
   Extract<AnalyticsEvent, { type: T }>,
@@ -20,7 +21,14 @@ type AnalyticsEventWithoutCommon<T extends AnalyticsEvent["type"]> = Omit<
 
 export type TrackEventInput = {
   [K in AnalyticsEvent["type"]]: AnalyticsEventWithoutCommon<K>;
-}[AnalyticsEvent["type"]];
+}[AnalyticsEvent["type"]] & {
+  /**
+   * Overrides the configured name for this event. SDKs that already know the
+   * flow they render (the React Native SDK) set it per event; standalone
+   * integrations name their flows once in `Onborn.init`.
+   */
+  flowName?: string;
+};
 
 export type EventContext = {
   appId: string;
@@ -30,11 +38,54 @@ export type EventContext = {
   userType?: "new" | "returning";
   appVersion: string;
   sdkVersion: string;
+  onboardingFlowName?: string;
+  paywallName?: string;
 };
+
+/** Thrown when an event has no name to report — see `Onborn.init`. */
+export class OnbornMissingFlowNameError extends Error {
+  constructor(eventType: string, configKey: string) {
+    super(
+      `Onborn: cannot track "${eventType}" without a flow name. ` +
+        `Pass \`${configKey}\` to Onborn.init(), or set \`flowName\` on the event.`,
+    );
+    this.name = "OnbornMissingFlowNameError";
+  }
+}
+
+function isPaywallEvent(type: string): boolean {
+  return type.startsWith("paywall_");
+}
+
+/**
+ * Which configured name an event belongs to. Paywall events carry the paywall
+ * name; everything else describes the onboarding flow.
+ */
+function resolveFlowName(
+  input: TrackEventInput,
+  context: EventContext,
+): string {
+  const explicit = input.flowName?.trim();
+  if (explicit) {
+    return explicit;
+  }
+  const paywall = isPaywallEvent(input.type);
+  const configured = (
+    paywall ? context.paywallName : context.onboardingFlowName
+  )?.trim();
+  if (configured) {
+    return configured;
+  }
+  throw new OnbornMissingFlowNameError(
+    input.type,
+    paywall ? "paywallName" : "onboardingFlowName",
+  );
+}
 
 export function buildAnalyticsEvent(input: TrackEventInput, context: EventContext): AnalyticsEvent {
   const candidate = {
     ...input,
+    flowName: resolveFlowName(input, context),
     eventId: createEventId(),
     timestamp: Date.now(),
     appId: context.appId,

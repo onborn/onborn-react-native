@@ -6,7 +6,8 @@ rendering an onboarding flow or paywall through `@onborn/rn-sdk`.
 
 Standalone analytics does not require an Onborn funnel or paywall. Create an
 Onborn project/app, use its SDK API key, and initialize analytics directly.
-Events still require a stable logical `flowId`, such as `app-lifecycle`, to
+Events require a stable logical `flowId`, such as `app-lifecycle`, plus the flow
+name configured in `Onborn.init` (`onboardingFlowName` / `paywallName`), to
 group sessions and metrics. That id does not need to reference a funnel created
 in the Onborn builder.
 
@@ -23,11 +24,12 @@ import { Onborn } from "@onborn/analytics";
 
 Onborn.init({
   apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
+  onboardingFlowName: "App onboarding",
+  paywallName: "Premium paywall",
   userId: "user-123",
   appId: "ios-app",
   platform: "ios",
   appVersion: "1.0.0",
-  sdkVersion: "0.1.0-beta.2",
 });
 ```
 
@@ -54,10 +56,11 @@ Events are queued and flushed in batches.
 Onborn.init({
   apiKey,
   userId,
+  onboardingFlowName: "App onboarding",
+  paywallName: "Premium paywall",
   appId: "ios-app",
   platform: "ios",
   appVersion: "1.0.0",
-  sdkVersion: "0.1.0-beta.2",
   maxAnalyticsBatchSize: 10,
   autoFlushMs: 10_000,
   maxAnalyticsQueueSize: 500,
@@ -125,7 +128,7 @@ separate quiz-answer event.
 
 Use stable `sessionId` values so Onborn can connect events into a funnel.
 
-Every event includes the same base context: `eventId`, `flowId`, `sessionId`,
+Every event includes the same base context: `eventId`, `flowId`, `flowName`, `sessionId`,
 `userId`, `appId`, `timestamp`, `platform`, `appVersion`, `sdkVersion`, optional
 `locale`, `country`, `userType`, and optional experiment fields
 `experimentId`, `experimentVariantId`, and `experimentAssignmentId`.

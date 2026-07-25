@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.1
+
+- Analytics events now carry the required `flowName` field. The SDK fills it from the
+  published flow's and paywall's own names, so builder integrations need no new config.
+- Added optional `onboardingFlowName` / `paywallName` overrides to
+  `ConversionFlowClientOptions` and `Onborn.init`.
+
 ## 0.1.0-beta.3
 
 - Updated `@onborn/billing` to the current-offering API; consumers no longer

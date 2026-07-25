@@ -3,6 +3,12 @@ import { z } from "zod";
 export const BaseEventSchema = z.object({
   eventId: z.string().uuid(),
   flowId: z.string(),
+  /**
+   * Human-readable name of the flow or paywall the event belongs to. Required:
+   * an analytics source the dashboard can only show as a uuid is a source
+   * nobody can reason about.
+   */
+  flowName: z.string().trim().min(1).max(60),
   sessionId: z.string(),
   userId: z.string(),
   appId: z.string(),

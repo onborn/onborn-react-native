@@ -22,6 +22,12 @@ import { resolveRuntimeLocale } from "../config/locale";
 export type ConversionFlowClientOptions = {
   apiKey: string;
   flowId: string;
+  /**
+   * Overrides the name reported with analytics events. Normally left unset:
+   * the client uses the published flow's and paywall's own names.
+   */
+  onboardingFlowName?: string;
+  paywallName?: string;
   userId?: string;
   locale?: string;
   appId?: string;
@@ -57,6 +63,8 @@ export class ConversionFlowClient {
   private readonly billingClient: BillingClient;
   private experimentContext: RuntimeExperimentContext | null = null;
   private sdkConnectionTracked = false;
+  private loadedFlowName: string | null = null;
+  private loadedPaywallName: string | null = null;
 
   constructor(options: ConversionFlowClientOptions) {
     this.options = {
@@ -67,6 +75,9 @@ export class ConversionFlowClient {
     this.emitAnalyticsEvents = options.emitAnalyticsEvents !== false;
     this.billingClient = new BillingClient({
       sourceId: this.options.flowId,
+      ...(this.options.paywallName
+        ? { paywallName: this.options.paywallName }
+        : {}),
     });
     if (this.emitAnalyticsEvents && options.emitSdkConnectionSignal !== false) {
       // Fire-and-forget: mark SDK connection as soon as client is initialized.
@@ -75,7 +86,11 @@ export class ConversionFlowClient {
   }
 
   async loadFlow(): Promise<FlowConfig> {
-    return fetchFlowConfig(this.flowFetchOptionsFromConfig(this.options));
+    const flow = await fetchFlowConfig(
+      this.flowFetchOptionsFromConfig(this.options),
+    );
+    this.loadedFlowName = flow.name?.trim() || null;
+    return flow;
   }
 
   setExperimentContext(context?: RuntimeExperimentContext | null): void {
@@ -83,7 +98,9 @@ export class ConversionFlowClient {
   }
 
   async loadPaywall(paywallId: string): Promise<GetPaywallResponse> {
-    return this.billingClient.loadPaywall(paywallId);
+    const response = await this.billingClient.loadPaywall(paywallId);
+    this.loadedPaywallName = response.paywall.name?.trim() || null;
+    return response;
   }
 
   async loadOffering(): Promise<GetOfferingResponse> {
@@ -530,8 +547,25 @@ export class ConversionFlowClient {
     experimentOverride?: RuntimeExperimentContext | null,
   ): Promise<void> {
     await Onborn.track(
-      this.withExperimentContext(input, experimentOverride),
+      this.withFlowName(this.withExperimentContext(input, experimentOverride)),
     );
+  }
+
+  /**
+   * Builder users never type a name: the flow and paywall already have one in
+   * the dashboard, so the client reports whichever it has fetched.
+   */
+  private withFlowName(input: TrackEventInput): TrackEventInput {
+    if (input.flowName) {
+      return input;
+    }
+    const paywallEvent = input.type.startsWith("paywall_");
+    const name = paywallEvent
+      ? (this.options.paywallName ?? this.loadedPaywallName ?? "Paywall")
+      : (this.options.onboardingFlowName ??
+        this.loadedFlowName ??
+        "Onboarding flow");
+    return { ...input, flowName: name } as TrackEventInput;
   }
 
   private withExperimentContext(

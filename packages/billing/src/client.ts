@@ -21,6 +21,8 @@ const ONBORN_API_BASE_URL = "https://api.testing.onborn.app";
 
 export type BillingClientOptions = {
   sourceId?: string;
+  /** Name reported with paywall events when the paywall config has none. */
+  paywallName?: string;
 };
 
 export class OnbornBillingRequestError extends Error {
@@ -46,6 +48,8 @@ export class BillingClient {
   private readonly fetchImpl: typeof fetch;
   private readonly emitAnalyticsEvents: boolean;
 
+  private loadedPaywallName: string | null = null;
+
   constructor(private readonly options: BillingClientOptions = {}) {
     this.config = resolveOnbornBillingConfig();
     this.userId = this.config.userId ?? createAnonymousUserId();
@@ -60,6 +64,7 @@ export class BillingClient {
     if (!parsed.success) {
       throw new Error("Invalid paywall response payload");
     }
+    this.loadedPaywallName = parsed.data.paywall.name?.trim() || null;
     return parsed.data;
   }
 
@@ -216,6 +221,10 @@ export class BillingClient {
     await Onborn.track({
       ...input,
       flowId: this.options.sourceId ?? "billing",
+      // Paywall events name themselves from the paywall they were loaded for,
+      // so billing works without the host app configuring anything.
+      flowName:
+        this.loadedPaywallName ?? this.options.paywallName ?? "Paywall",
       userId: this.userId,
     } as TrackEventInput);
   }

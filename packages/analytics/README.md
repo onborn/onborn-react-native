@@ -14,11 +14,13 @@ import { Onborn } from "@onborn/analytics";
 
 Onborn.init({
   apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
+  // Required: every event reports the name of the flow or paywall it belongs to.
+  onboardingFlowName: "App onboarding",
+  paywallName: "Premium paywall",
   userId: "user-123",
   appId: "my-ios-app",
   platform: "ios",
   appVersion: "1.0.0",
-  sdkVersion: "0.1.0-beta.2",
 });
 
 await Onborn.track({

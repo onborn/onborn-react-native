@@ -1,6 +1,6 @@
 {
   "name": "@onborn/billing",
-  "version": "0.1.0-beta.7",
+  "version": "0.1.0-beta.8",
   "description": "Headless billing, offerings, purchases, restores, and entitlements for Onborn.",
   "license": "UNLICENSED",
   "repository": {
@@ -46,8 +46,8 @@
     "prepack": "yarn build"
   },
   "dependencies": {
-    "@onborn/analytics": "0.1.0-beta.3",
-    "@onborn/sdk-contracts": "0.1.0-beta.3"
+    "@onborn/analytics": "0.2.0-beta.1",
+    "@onborn/sdk-contracts": "0.2.0-beta.1"
   },
   "peerDependencies": {
     "expo-iap": ">=4.5.0",

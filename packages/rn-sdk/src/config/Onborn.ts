@@ -8,6 +8,8 @@ export type OnbornConfig = Omit<AnalyticsOnbornConfig, "analyticsStorage">;
 
 const GLOBAL_CONFIG_KEYS = [
   "apiKey",
+  "onboardingFlowName",
+  "paywallName",
   "userId",
   "locale",
   "appId",

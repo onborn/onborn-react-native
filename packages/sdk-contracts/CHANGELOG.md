@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0-beta.1
+
+- **Breaking:** `BaseEventSchema` requires `flowName` (1–60 chars) on every analytics event.
+
 ## 0.1.0-beta.3
 
 - Added `BillingProduct.priceAmount`: the numeric price in major currency units, so apps can do price math without parsing the localized display string or reaching into `metadata`.
