@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-beta.9
+
+- `resolveOnbornBillingConfig` now treats `onboardingFlowName` and `paywallName` as global
+  config keys, so a per-hook override cannot shadow the names set in `Onborn.init`.
+
 ## 0.1.0-beta.8
 
 - Paywall events now report the loaded paywall's name as the required `flowName`, with an

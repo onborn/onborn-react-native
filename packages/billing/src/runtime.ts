@@ -5,6 +5,8 @@ import {
 
 const GLOBAL_CONFIG_KEYS = [
   "apiKey",
+  "onboardingFlowName",
+  "paywallName",
   "userId",
   "locale",
   "appId",

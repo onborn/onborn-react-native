@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0-beta.2
+
+- Bumped `@onborn/billing` to `0.1.0-beta.9`.
+
 ## 0.2.0-beta.1
 
 - Analytics events now carry the required `flowName` field. The SDK fills it from the
