@@ -7,6 +7,7 @@ import {
   BuilderV2UiIrNodeSchema,
   type BuilderV2UiIrNode,
 } from "./builder-v2-ui-ir-primitives";
+import { BuilderV2UiIrScreenStateSchema } from "./builder-v2-ui-ir-interaction";
 
 export const BUILDER_V2_UI_IR_FORMAT = "onborn-ui-ir-v1" as const;
 export const BUILDER_V2_UI_IR_SCHEMA_VERSION = 1 as const;
@@ -25,6 +26,17 @@ export const BuilderV2UiIrScreenSchema = z
     screenId: UiIrIdSchema,
     surface: BuilderV2ProjectSurfaceSchema,
     placement: z.string().trim().min(1).max(120).optional(),
+    /**
+     * The screen's named selections, with their initial values. Every state a
+     * condition or a state.set action refers to is declared here, so the whole
+     * state space is readable from the document.
+     */
+    state: z
+      .record(
+        z.string().trim().min(1).max(80),
+        BuilderV2UiIrScreenStateSchema,
+      )
+      .optional(),
     root: BuilderV2UiIrNodeSchema,
   })
   .strict()

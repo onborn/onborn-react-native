@@ -29,6 +29,8 @@ import { UiIrAnimatedView } from "./ui-ir-animated-view";
 import { UiIrPhosphorIcon } from "./ui-ir-phosphor-icon";
 import { UiIrPressable } from "./ui-ir-pressable";
 import { UiIrVectorNode } from "./ui-ir-vector-node";
+import { uiIrConditionHolds } from "../domain/ui-ir-state";
+import { useUiIrScreenState } from "./ui-ir-screen-state";
 
 type UiIrNodeProps = {
   document: BuilderV2UiIrDocument;
@@ -39,8 +41,41 @@ type UiIrNodeProps = {
   assets: ReadonlyMap<string, BuilderV2UiIrAsset>;
 };
 
-export function UiIrNode(props: UiIrNodeProps): ReactElement {
-  const element = renderNodeElement(props);
+export function UiIrNode(props: UiIrNodeProps): ReactElement | null {
+  const screenState = useUiIrScreenState();
+  /*
+   * Runtime-dependent appearance, all three slots the dialect has: a node may
+   * not render at all, may merge variant styles while a selection holds, and
+   * may report itself selected to a screen reader. Evaluated here, before the
+   * per-type rendering, so every node type gets them for free.
+   */
+  if (
+    props.node.presence &&
+    !uiIrConditionHolds(screenState.values, props.node.presence)
+  ) {
+    return null;
+  }
+  const activeVariantStyle = (props.node.variants ?? [])
+    .filter((variant) => uiIrConditionHolds(screenState.values, variant.when))
+    .reduce<BuilderV2UiIrStyle>(
+      (merged, variant) => ({ ...merged, ...variant.style }),
+      {},
+    );
+  const nodeStyle: BuilderV2UiIrStyle | undefined =
+    Object.keys(activeVariantStyle).length > 0
+      ? { ...props.node.style, ...activeVariantStyle }
+      : props.node.style;
+  const accessibilityState = props.node.accessibilitySelected
+    ? {
+        accessibilityState: {
+          selected: uiIrConditionHolds(
+            screenState.values,
+            props.node.accessibilitySelected,
+          ),
+        },
+      }
+    : {};
+  const element = renderNodeElement(props, nodeStyle, accessibilityState);
   return decorateRenderedUiIrNode(props.ports, {
     screenId: props.screenId,
     node: props.node,
@@ -48,12 +83,17 @@ export function UiIrNode(props: UiIrNodeProps): ReactElement {
   });
 }
 
-function renderNodeElement(props: UiIrNodeProps): ReactElement {
-  const common = createUiIrNodeCommonProps(
-    props.node,
-    props.document,
-    props.locale,
-  );
+function renderNodeElement(
+  props: UiIrNodeProps,
+  nodeStyle: BuilderV2UiIrStyle | undefined,
+  accessibilityState: {
+    accessibilityState?: { selected: boolean };
+  },
+): ReactElement {
+  const common = {
+    ...createUiIrNodeCommonProps(props.node, props.document, props.locale),
+    ...accessibilityState,
+  };
   switch (props.node.type) {
     case "view":
     case "safe-area-view":
@@ -70,7 +110,7 @@ function renderNodeElement(props: UiIrNodeProps): ReactElement {
             exitTransition={props.node.exitTransition}
             kind={props.node.type}
             layoutTransition={props.node.layoutTransition}
-            style={props.node.style}
+            style={nodeStyle}
           >
             {renderChildren(props)}
           </UiIrAnimatedView>
@@ -78,26 +118,26 @@ function renderNodeElement(props: UiIrNodeProps): ReactElement {
       }
       if (props.node.type === "safe-area-view") {
         return (
-          <SafeAreaView {...common} style={asViewStyle(props.node.style)}>
+          <SafeAreaView {...common} style={asViewStyle(nodeStyle)}>
             {renderChildren(props)}
           </SafeAreaView>
         );
       }
       if (props.node.type === "scroll-view") {
         return (
-          <ScrollView {...common} style={asViewStyle(props.node.style)}>
+          <ScrollView {...common} style={asViewStyle(nodeStyle)}>
             {renderChildren(props)}
           </ScrollView>
         );
       }
       return (
-        <View {...common} style={asViewStyle(props.node.style)}>
+        <View {...common} style={asViewStyle(nodeStyle)}>
           {renderChildren(props)}
         </View>
       );
     case "text":
       return (
-        <Text {...common} style={asTextStyle(props.node.style)}>
+        <Text {...common} style={asTextStyle(nodeStyle)}>
           {resolveUiIrText(props.document, props.node.text, props.locale)}
         </Text>
       );
@@ -107,7 +147,7 @@ function renderNodeElement(props: UiIrNodeProps): ReactElement {
           {...common}
           source={resolveAsset(props, props.node.assetId)}
           resizeMode={props.node.resizeMode}
-          style={asImageStyle(props.node.style)}
+          style={asImageStyle(nodeStyle)}
         />
       );
     case "image-background":
@@ -116,7 +156,7 @@ function renderNodeElement(props: UiIrNodeProps): ReactElement {
           {...common}
           source={resolveAsset(props, props.node.assetId)}
           resizeMode={props.node.resizeMode}
-          style={asViewStyle(props.node.style)}
+          style={asViewStyle(nodeStyle)}
         >
           {renderChildren(props)}
         </ImageBackground>
@@ -125,6 +165,8 @@ function renderNodeElement(props: UiIrNodeProps): ReactElement {
       return (
         <UiIrPressable
           accessibilityLabel={common.accessibilityLabel}
+          accessibilityState={accessibilityState.accessibilityState}
+          style={nodeStyle}
           node={props.node}
           ports={props.ports}
           screenId={props.screenId}

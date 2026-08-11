@@ -12,7 +12,9 @@ import {
 } from "./builder-v2-ui-ir-motion";
 import {
   BuilderV2UiIrPressFeedbackSchema,
+  BuilderV2UiIrStateConditionSchema,
   type BuilderV2UiIrPressFeedback,
+  type BuilderV2UiIrStateCondition,
 } from "./builder-v2-ui-ir-interaction";
 import {
   BuilderV2UiIrVectorPaintSchema,
@@ -109,6 +111,13 @@ export const BuilderV2UiIrTextSchema = z.discriminatedUnion("kind", [
 ]);
 
 export const BuilderV2UiIrActionSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("state.set"),
+      state: z.string().trim().min(1).max(80),
+      value: z.union([z.string().max(240), z.null()]),
+    })
+    .strict(),
   z.object({ type: z.literal("navigation.next") }).strict(),
   z.object({ type: z.literal("navigation.back") }).strict(),
   z.object({ type: z.literal("navigation.complete") }).strict(),
@@ -148,6 +157,15 @@ export const BuilderV2UiIrActionSchema = z.discriminatedUnion("type", [
 type NodeBase = {
   id: string;
   style?: Record<string, BuilderV2UiIrJsonValue>;
+  /** Merged over `style`, in order, while their condition holds. */
+  variants?: Array<{
+    when: BuilderV2UiIrStateCondition;
+    style: Record<string, BuilderV2UiIrJsonValue>;
+  }>;
+  /** The node renders only while this holds. Absent means always. */
+  presence?: BuilderV2UiIrStateCondition;
+  /** Reported as accessibilityState.selected while this holds. */
+  accessibilitySelected?: BuilderV2UiIrStateCondition;
   source?: z.infer<typeof BuilderV2UiIrSourceRefSchema>;
   /**
    * What a screen reader announces for this node.
@@ -187,8 +205,20 @@ export type BuilderV2UiIrNode =
   | (NodeBase & {
       type: "pressable";
       action: z.infer<typeof BuilderV2UiIrActionSchema>;
-      disabled?: boolean;
+      disabled?: boolean | BuilderV2UiIrStateCondition;
       contentStyle?: Record<string, BuilderV2UiIrJsonValue>;
+      /**
+       * Merged over `style` while the press is held.
+       *
+       * A second static object rather than an expression, so the artifact stays
+       * a description. `feedback` covers the motion an element performs —
+       * shrinking, dimming, a haptic tap — and this covers the far more common
+       * thing a designer asks for: a different background or border while held.
+       * The dialect could express neither, so the ordinary React Native idiom
+       * `style={({ pressed }) => [base, pressed && held]}` could not be
+       * published at all.
+       */
+      pressedStyle?: Record<string, BuilderV2UiIrJsonValue>;
       feedback?: BuilderV2UiIrPressFeedback;
       children: BuilderV2UiIrNode[];
     })
@@ -239,6 +269,19 @@ export type BuilderV2UiIrNode =
 const CommonNodeSchema = z.object({
   id: UiIrIdSchema,
   style: BuilderV2UiIrStyleSchema.optional(),
+  variants: z
+    .array(
+      z
+        .object({
+          when: BuilderV2UiIrStateConditionSchema,
+          style: BuilderV2UiIrStyleSchema,
+        })
+        .strict(),
+    )
+    .max(8)
+    .optional(),
+  presence: BuilderV2UiIrStateConditionSchema.optional(),
+  accessibilitySelected: BuilderV2UiIrStateConditionSchema.optional(),
   source: BuilderV2UiIrSourceRefSchema.optional(),
   accessibilityLabel: BuilderV2UiIrTextSchema.optional(),
 });
@@ -289,8 +332,11 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
       CommonNodeSchema.extend({
         type: z.literal("pressable"),
         action: BuilderV2UiIrActionSchema,
-        disabled: z.boolean().optional(),
+        disabled: z
+          .union([z.boolean(), BuilderV2UiIrStateConditionSchema])
+          .optional(),
         contentStyle: BuilderV2UiIrStyleSchema.optional(),
+        pressedStyle: BuilderV2UiIrStyleSchema.optional(),
         feedback: BuilderV2UiIrPressFeedbackSchema.optional(),
         children: z.array(BuilderV2UiIrNodeSchema).max(1_000),
       }).strict(),

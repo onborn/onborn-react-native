@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, type PressableProps, type ViewStyle } from "react-native";
 import Animated, {
   ReduceMotion,
@@ -11,6 +11,8 @@ import Animated, {
 import type { BuilderV2UiIrNode } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
 import type { UiIrRendererPorts } from "../ports/ui-ir-renderer";
+import { uiIrConditionHolds } from "../domain/ui-ir-state";
+import { useUiIrScreenState } from "./ui-ir-screen-state";
 
 type PressableNode = Extract<BuilderV2UiIrNode, { type: "pressable" }>;
 
@@ -20,6 +22,10 @@ type UiIrPressableProps = {
   ports: UiIrRendererPorts;
   /** Already resolved against the document and locale by the caller. */
   accessibilityLabel?: string;
+  /** Reported to the screen reader, resolved by the caller. */
+  accessibilityState?: { selected: boolean };
+  /** The node's style with active variants merged, resolved by the caller. */
+  style?: PressableNode["style"];
   children: ReactNode;
 };
 
@@ -32,9 +38,21 @@ export function UiIrPressable(props: UiIrPressableProps) {
     opacity.value = props.node.feedback?.opacity?.idle ?? 1;
   }, [opacity, props.node.feedback, scale]);
 
-  const common = props.accessibilityLabel
-    ? { accessibilityLabel: props.accessibilityLabel }
-    : {};
+  const screenState = useUiIrScreenState();
+  /*
+   * Disabled may be a fact or a condition — "until something is selected". The
+   * screen reader hears the same answer the touch system enforces.
+   */
+  const disabled =
+    typeof props.node.disabled === "object"
+      ? uiIrConditionHolds(screenState.values, props.node.disabled)
+      : (props.node.disabled ?? false);
+  const common = {
+    ...(props.accessibilityLabel
+      ? { accessibilityLabel: props.accessibilityLabel }
+      : {}),
+    accessibilityState: { ...props.accessibilityState, disabled },
+  };
   const hasScaleFeedback = Boolean(props.node.feedback?.scale);
   const hasOpacityFeedback = Boolean(props.node.feedback?.opacity);
   const animatedStyle = useAnimatedStyle(
@@ -44,17 +62,39 @@ export function UiIrPressable(props: UiIrPressableProps) {
     }),
     [hasOpacityFeedback, hasScaleFeedback],
   );
+  /*
+   * The held appearance rides on the outer view, because that is where the
+   * node's own style lives — putting it on the inner Pressable would layer it
+   * over contentStyle instead, and a pressed background would land behind the
+   * wrong box.
+   */
+  const [pressed, setPressed] = useState(false);
+  const heldStyle =
+    pressed && props.node.pressedStyle
+      ? asViewStyle(props.node.pressedStyle)
+      : undefined;
+
   return (
-    <Animated.View style={[asViewStyle(props.node.style), animatedStyle]}>
+    <Animated.View
+      style={[
+        asViewStyle(props.style ?? props.node.style),
+        heldStyle,
+        animatedStyle,
+      ]}
+    >
       <Pressable
         {...common}
-        disabled={props.node.disabled}
-        onPress={() => handlePress(props)}
+        disabled={disabled}
+        onPress={() => handlePress(props, screenState.set)}
         onPressIn={() => {
+          setPressed(true);
           animateFeedback(props.node, scale, opacity, true);
           triggerHaptic(props);
         }}
-        onPressOut={() => animateFeedback(props.node, scale, opacity, false)}
+        onPressOut={() => {
+          setPressed(false);
+          animateFeedback(props.node, scale, opacity, false);
+        }}
         style={asPressableStyle(props.node.contentStyle)}
       >
         {props.children}
@@ -63,7 +103,18 @@ export function UiIrPressable(props: UiIrPressableProps) {
   );
 }
 
-function handlePress(props: UiIrPressableProps): void {
+function handlePress(
+  props: UiIrPressableProps,
+  setState: (state: string, value: string | null) => void,
+): void {
+  /*
+   * Selection is the screen's own affair; it never leaves the device, so it is
+   * not a port. Everything else stays host-handled.
+   */
+  if (props.node.action.type === "state.set") {
+    setState(props.node.action.state, props.node.action.value);
+    return;
+  }
   void props.ports.handleAction({
     screenId: props.screenId,
     nodeId: props.node.id,
