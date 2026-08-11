@@ -16,7 +16,7 @@ export type MockBillingAdapterOptions = {
 
 /**
  * Dev-only billing adapter: simulates successful store purchase/restore without
- * RevenueCat or native IAP. Pair with ONBORN `test` environment for end-to-end
+ * a native IAP provider. Pair with ONBORN `test` environment for end-to-end
  * paywall → validate → entitlement flow.
  */
 export function createMockBillingAdapter(

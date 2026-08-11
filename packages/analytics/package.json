@@ -1,6 +1,6 @@
 {
   "name": "@onborn/analytics",
-  "version": "0.2.0-beta.1",
+  "version": "0.3.0-beta.1",
   "description": "Analytics client for Onborn SDKs.",
   "license": "UNLICENSED",
   "repository": {
@@ -36,12 +36,13 @@
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit",
+    "test": "node --import tsx --test src/*.test.ts",
     "sync-version": "node scripts/sync-version.mjs",
     "check-version": "node scripts/sync-version.mjs --check",
     "prepack": "yarn sync-version && yarn build"
   },
   "dependencies": {
-    "@onborn/sdk-contracts": "0.2.0-beta.1",
+    "@onborn/sdk-contracts": "0.3.0-beta.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -49,6 +50,7 @@
     "@repo/typescript-config": "*",
     "@types/node": "^22.15.3",
     "eslint": "^9.39.1",
+    "tsx": "^4.21.0",
     "typescript": "5.9.2"
   }
 }

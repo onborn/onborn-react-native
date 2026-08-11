@@ -7,6 +7,10 @@ export {
   type OnbornConfig,
 } from "./config/Onborn";
 export * from "./config/templates";
+export {
+  OnbornFlow,
+  type OnbornFlowProps,
+} from "./builder-v2/OnbornFlow";
 export * from "./hooks/useSubscriptionFlow";
 export * from "./paywall";
 export {

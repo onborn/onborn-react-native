@@ -8,13 +8,19 @@ cd "$ROOT_DIR"
 
 PACKAGE_DIRS=(
   "packages/sdk-contracts"
+  "packages/runtime-ui-ir"
+  "packages/runtime-expo-ui-ir"
   "packages/analytics"
   "packages/billing"
   "packages/rn-sdk"
 )
 
+# Dependency order. rn-sdk imports both runtime packages, so their dist has to
+# exist before its tsc runs.
 BUILD_ORDER=(
   "@onborn/sdk-contracts"
+  "@onborn/runtime-ui-ir"
+  "@onborn/runtime-expo-ui-ir"
   "@onborn/analytics"
   "@onborn/billing"
   "@onborn/rn-sdk"

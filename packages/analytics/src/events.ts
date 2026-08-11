@@ -82,12 +82,16 @@ function resolveFlowName(
   );
 }
 
-export function buildAnalyticsEvent(input: TrackEventInput, context: EventContext): AnalyticsEvent {
+export function buildAnalyticsEvent(
+  input: TrackEventInput,
+  context: EventContext,
+  timestamp = Date.now(),
+): AnalyticsEvent {
   const candidate = {
     ...input,
     flowName: resolveFlowName(input, context),
     eventId: createEventId(),
-    timestamp: Date.now(),
+    timestamp,
     appId: context.appId,
     platform: context.platform,
     locale: context.locale,

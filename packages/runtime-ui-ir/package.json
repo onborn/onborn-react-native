@@ -1,0 +1,75 @@
+{
+  "name": "@onborn/runtime-ui-ir",
+  "version": "0.2.0-beta.1",
+  "description": "Verified UI IR runtime used by Onborn client SDKs.",
+  "license": "UNLICENSED",
+  "private": false,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "react-native": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "react-native": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./actions": {
+      "types": "./dist/actions.d.ts",
+      "react-native": "./dist/actions.js",
+      "default": "./dist/actions.js"
+    },
+    "./artifact": {
+      "types": "./dist/artifact.d.ts",
+      "react-native": "./dist/artifact.js",
+      "default": "./dist/artifact.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "react-native": "./dist/react.js",
+      "default": "./dist/react.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "prepack": "yarn build"
+  },
+  "dependencies": {
+    "@noble/ed25519": "3.1.0",
+    "@noble/hashes": "2.2.0",
+    "@onborn/sdk-contracts": "0.3.0-beta.1",
+    "phosphor-react-native": "3.0.6"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.81.0",
+    "react-native-reanimated": ">=4.5.0",
+    "react-native-worklets": ">=0.10.0",
+    "react-native-svg": ">=15.0.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "eslint": "^9.39.1",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-reanimated": "4.5.0",
+    "react-native-worklets": "0.10.0",
+    "react-native-svg": "15.15.5",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.2"
+  }
+}

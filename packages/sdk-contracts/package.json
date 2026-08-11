@@ -1,6 +1,6 @@
 {
   "name": "@onborn/sdk-contracts",
-  "version": "0.2.0-beta.1",
+  "version": "0.3.0-beta.1",
   "description": "Runtime-safe contracts used by Onborn client SDKs.",
   "license": "UNLICENSED",
   "repository": {
@@ -20,6 +20,86 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./builder-v2-runtime-platform": {
+      "types": "./dist/builder-v2-runtime-platform.d.ts",
+      "default": "./dist/builder-v2-runtime-platform.js"
+    },
+    "./builder-v2-artifact-lineage": {
+      "types": "./dist/builder-v2-artifact-lineage.d.ts",
+      "default": "./dist/builder-v2-artifact-lineage.js"
+    },
+    "./builder-v2-runtime-control": {
+      "types": "./dist/builder-v2-runtime-control.d.ts",
+      "default": "./dist/builder-v2-runtime-control.js"
+    },
+    "./builder-v2-instrumentation": {
+      "types": "./dist/builder-v2-instrumentation.d.ts",
+      "default": "./dist/builder-v2-instrumentation.js"
+    },
+    "./builder-v2-runtime-events": {
+      "types": "./dist/builder-v2-runtime-events.d.ts",
+      "default": "./dist/builder-v2-runtime-events.js"
+    },
+    "./builder-v2-runtime-capabilities": {
+      "types": "./dist/builder-v2-runtime-capabilities.d.ts",
+      "default": "./dist/builder-v2-runtime-capabilities.js"
+    },
+    "./builder-v2-runtime-api-manifest": {
+      "types": "./dist/builder-v2-runtime-api-manifest.d.ts",
+      "default": "./dist/builder-v2-runtime-api-manifest.js"
+    },
+    "./builder-v2-native-capabilities": {
+      "types": "./dist/builder-v2-native-capabilities.d.ts",
+      "default": "./dist/builder-v2-native-capabilities.js"
+    },
+    "./builder-v2-project": {
+      "types": "./dist/builder-v2-project.d.ts",
+      "default": "./dist/builder-v2-project.js"
+    },
+    "./builder-v2-project-assets": {
+      "types": "./dist/builder-v2-project-assets.d.ts",
+      "default": "./dist/builder-v2-project-assets.js"
+    },
+    "./builder-v2-google-fonts": {
+      "types": "./dist/builder-v2-google-fonts.d.ts",
+      "default": "./dist/builder-v2-google-fonts.js"
+    },
+    "./builder-v2-lottie": {
+      "types": "./dist/builder-v2-lottie.d.ts",
+      "default": "./dist/builder-v2-lottie.js"
+    },
+    "./builder-v2-phosphor-icons": {
+      "types": "./dist/builder-v2-phosphor-icons.d.ts",
+      "default": "./dist/builder-v2-phosphor-icons.js"
+    },
+    "./builder-v2-theme": {
+      "types": "./dist/builder-v2-theme.d.ts",
+      "default": "./dist/builder-v2-theme.js"
+    },
+    "./builder-v2-paywall": {
+      "types": "./dist/builder-v2-paywall.d.ts",
+      "default": "./dist/builder-v2-paywall.js"
+    },
+    "./builder-v2-ui-ir-primitives": {
+      "types": "./dist/builder-v2-ui-ir-primitives.d.ts",
+      "default": "./dist/builder-v2-ui-ir-primitives.js"
+    },
+    "./builder-v2-ui-ir": {
+      "types": "./dist/builder-v2-ui-ir.d.ts",
+      "default": "./dist/builder-v2-ui-ir.js"
+    },
+    "./builder-v2-ui-ir-artifact": {
+      "types": "./dist/builder-v2-ui-ir-artifact.d.ts",
+      "default": "./dist/builder-v2-ui-ir-artifact.js"
+    },
+    "./builder-v2-ui-ir-runtime": {
+      "types": "./dist/builder-v2-ui-ir-runtime.d.ts",
+      "default": "./dist/builder-v2-ui-ir-runtime.js"
+    },
+    "./analytics": {
+      "types": "./dist/analytics.d.ts",
+      "default": "./dist/analytics.js"
     }
   },
   "files": [
@@ -35,7 +115,8 @@
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "lint": "eslint . --max-warnings 0",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "node --import tsx --test src/*.test.ts"
   },
   "dependencies": {
     "zod": "^3.25.76"
@@ -45,6 +126,7 @@
     "@repo/typescript-config": "*",
     "@types/node": "^22.15.3",
     "eslint": "^9.39.1",
+    "tsx": "^4.21.0",
     "typescript": "5.9.2"
   }
 }

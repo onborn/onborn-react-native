@@ -8,7 +8,7 @@ export const BaseEventSchema = z.object({
    * an analytics source the dashboard can only show as a uuid is a source
    * nobody can reason about.
    */
-  flowName: z.string().trim().min(1).max(60),
+  flowName: z.string().trim().min(1).max(120),
   sessionId: z.string(),
   userId: z.string(),
   appId: z.string(),
@@ -22,6 +22,11 @@ export const BaseEventSchema = z.object({
   experimentId: z.string().optional(),
   experimentVariantId: z.string().optional(),
   experimentAssignmentId: z.string().optional(),
+  runtimeSource: z.literal("builder_v2").optional(),
+  runtimeVersion: z.string().optional(),
+  runtimeTarget: z.enum(["ios", "android", "web"]).optional(),
+  artifactId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  releaseId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 });
 
 export const FlowStartedEventSchema = BaseEventSchema.extend({
@@ -49,6 +54,61 @@ export const StepSkippedEventSchema = BaseEventSchema.extend({
   type: z.literal("step_skipped"),
   stepId: z.string(),
   stepIndex: z.number(),
+});
+
+export const StepReturnedEventSchema = BaseEventSchema.extend({
+  type: z.literal("step_returned"),
+  stepId: z.string(),
+  stepType: z.string(),
+  stepIndex: z.number(),
+});
+
+export const FlowResumedEventSchema = BaseEventSchema.extend({
+  type: z.literal("flow_resumed"),
+});
+
+export const FlowSkippedEventSchema = BaseEventSchema.extend({
+  type: z.literal("flow_skipped"),
+  stepsCompleted: z.number(),
+});
+
+export const FlowDismissedEventSchema = BaseEventSchema.extend({
+  type: z.literal("flow_dismissed"),
+  stepsCompleted: z.number(),
+});
+
+export const RuntimeInteractionTriggeredEventSchema = BaseEventSchema.extend({
+  type: z.literal("runtime_interaction_triggered"),
+  stepId: z.string(),
+  stepType: z.string(),
+  stepIndex: z.number(),
+  nodeId: z.string(),
+  interactionId: z.string(),
+  interactionKind: z.enum([
+    "press",
+    "long_press",
+    "submit",
+    "change",
+    "value_change",
+    "focus",
+    "blur",
+  ]),
+});
+
+export const RuntimeCustomEventSchema = BaseEventSchema.extend({
+  type: z.literal("runtime_custom_event"),
+  stepId: z.string(),
+  stepType: z.string(),
+  stepIndex: z.number(),
+  nodeId: z.string(),
+  eventName: z.string().trim().min(1).max(120),
+  properties: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const ExperimentExposedEventSchema = BaseEventSchema.extend({
+  type: z.literal("experiment_exposed"),
+  experimentId: z.string(),
+  experimentVariantId: z.string(),
 });
 
 export const FlowCompletedEventSchema = BaseEventSchema.extend({
@@ -172,6 +232,13 @@ export const AnalyticsEventSchema = z.discriminatedUnion("type", [
   StepViewedEventSchema,
   StepCompletedEventSchema,
   StepSkippedEventSchema,
+  StepReturnedEventSchema,
+  FlowResumedEventSchema,
+  FlowSkippedEventSchema,
+  FlowDismissedEventSchema,
+  RuntimeInteractionTriggeredEventSchema,
+  RuntimeCustomEventSchema,
+  ExperimentExposedEventSchema,
   FlowCompletedEventSchema,
   PaywallViewedEventSchema,
   PaywallPackageSelectedEventSchema,

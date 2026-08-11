@@ -1,4 +1,6 @@
 import type { AnalyticsEvent } from "@onborn/sdk-contracts";
+import type { BuilderV2RuntimeEvent } from "@onborn/sdk-contracts/builder-v2-runtime-events";
+import { BuilderV2RuntimeEventMapper } from "./builder-v2-runtime";
 import { buildAnalyticsEvent, type AnalyticsPlatform, type TrackEventInput } from "./events";
 import { flushBatch, type FetchLike } from "./flush";
 import { AnalyticsQueue } from "./queue";
@@ -116,8 +118,11 @@ class AnalyticsClient {
     this.endpoint = buildEventsEndpoint(DEFAULT_ONBORN_API_BASE_URL);
   }
 
-  async track(input: TrackEventInput): Promise<AnalyticsEvent> {
-    const event = buildAnalyticsEvent(input, this.context);
+  async track(
+    input: TrackEventInput,
+    timestamp?: number,
+  ): Promise<AnalyticsEvent> {
+    const event = buildAnalyticsEvent(input, this.context, timestamp);
     await this.queue.enqueue(event);
     return event;
   }
@@ -204,6 +209,7 @@ class AnalyticsClient {
 
 let globalOnbornConfig: OnbornConfig | null = null;
 let globalAnalyticsClient: AnalyticsClient | null = null;
+let globalRuntimeEventMapper = new BuilderV2RuntimeEventMapper();
 
 export const Onborn = {
   /**
@@ -214,6 +220,7 @@ export const Onborn = {
    */
   init(config: OnbornConfig): void {
     globalAnalyticsClient?.stopAutoFlush();
+    globalRuntimeEventMapper = new BuilderV2RuntimeEventMapper();
     const normalizedConfig = {
       ...config,
       userId: config.userId ?? createAnonymousUserId(),
@@ -277,6 +284,19 @@ export const Onborn = {
         ? { ...input, userId: config.userId }
         : input;
     return client.track(candidate as TrackEventInput);
+  },
+
+  async emitRuntimeEvent(
+    event: BuilderV2RuntimeEvent,
+  ): Promise<AnalyticsEvent> {
+    const client = requireAnalyticsClient();
+    const config = requireOnbornConfig();
+    const mappedEvent = globalRuntimeEventMapper.map(event);
+    const candidate =
+      config.userId && !("userId" in mappedEvent.input)
+        ? { ...mappedEvent.input, userId: config.userId }
+        : mappedEvent.input;
+    return client.track(candidate as TrackEventInput, mappedEvent.timestamp);
   },
 
   flush(): Promise<FlushSummary> {

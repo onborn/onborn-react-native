@@ -2452,8 +2452,8 @@ function toError(error: unknown): Error {
 }
 
 /**
- * Best-effort classification of a thrown purchase error. Store SDKs (RevenueCat,
- * native IAP) surface user cancellation via `userCancelled`/cancel codes; anything
+ * Best-effort classification of a thrown purchase error. Native IAP providers
+ * surface user cancellation via `userCancelled`/cancel codes; anything
  * else is treated as a technical error so the analytics funnel can distinguish
  * "user backed out" from "purchase broke".
  */

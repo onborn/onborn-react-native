@@ -2,7 +2,7 @@
  * Normalized purchase errors.
  *
  * Store SDKs report failures with their own vocabulary (expo-iap's
- * `ErrorCode`, StoreKit/Play error objects, RevenueCat codes), which pushed
+ * `ErrorCode` and StoreKit/Play error objects), which pushed
  * every host app into sniffing raw error shapes just to answer the one
  * question every paywall asks: "did the user cancel, or did something break?".
  * Adapters map their store's error onto `OnbornPurchaseError` so apps branch
