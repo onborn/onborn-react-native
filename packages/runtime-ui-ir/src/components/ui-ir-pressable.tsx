@@ -1,9 +1,5 @@
 import { useEffect, type ReactNode } from "react";
-import {
-  Pressable,
-  type PressableProps,
-  type ViewStyle,
-} from "react-native";
+import { Pressable, type PressableProps, type ViewStyle } from "react-native";
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -15,7 +11,6 @@ import Animated, {
 import type { BuilderV2UiIrNode } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
 import type { UiIrRendererPorts } from "../ports/ui-ir-renderer";
-import { createUiIrNodeCommonProps } from "./ui-ir-node-props";
 
 type PressableNode = Extract<BuilderV2UiIrNode, { type: "pressable" }>;
 
@@ -23,6 +18,8 @@ type UiIrPressableProps = {
   node: PressableNode;
   screenId: string;
   ports: UiIrRendererPorts;
+  /** Already resolved against the document and locale by the caller. */
+  accessibilityLabel?: string;
   children: ReactNode;
 };
 
@@ -35,7 +32,9 @@ export function UiIrPressable(props: UiIrPressableProps) {
     opacity.value = props.node.feedback?.opacity?.idle ?? 1;
   }, [opacity, props.node.feedback, scale]);
 
-  const common = createUiIrNodeCommonProps(props.node);
+  const common = props.accessibilityLabel
+    ? { accessibilityLabel: props.accessibilityLabel }
+    : {};
   const hasScaleFeedback = Boolean(props.node.feedback?.scale);
   const hasOpacityFeedback = Boolean(props.node.feedback?.opacity);
   const animatedStyle = useAnimatedStyle(

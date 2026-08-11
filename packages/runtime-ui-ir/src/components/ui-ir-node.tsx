@@ -49,7 +49,11 @@ export function UiIrNode(props: UiIrNodeProps): ReactElement {
 }
 
 function renderNodeElement(props: UiIrNodeProps): ReactElement {
-  const common = createUiIrNodeCommonProps(props.node);
+  const common = createUiIrNodeCommonProps(
+    props.node,
+    props.document,
+    props.locale,
+  );
   switch (props.node.type) {
     case "view":
     case "safe-area-view":
@@ -120,6 +124,7 @@ function renderNodeElement(props: UiIrNodeProps): ReactElement {
     case "pressable":
       return (
         <UiIrPressable
+          accessibilityLabel={common.accessibilityLabel}
           node={props.node}
           ports={props.ports}
           screenId={props.screenId}
@@ -135,7 +140,7 @@ function renderNodeElement(props: UiIrNodeProps): ReactElement {
     case "svg-group":
       return (
         <UiIrVectorNode
-          accessibilityLabel={props.node.accessibilityLabel}
+          accessibilityLabel={common.accessibilityLabel}
           node={props.node}
         >
           {renderChildren(props)}
@@ -145,7 +150,7 @@ function renderNodeElement(props: UiIrNodeProps): ReactElement {
     case "svg-circle":
       return (
         <UiIrVectorNode
-          accessibilityLabel={props.node.accessibilityLabel}
+          accessibilityLabel={common.accessibilityLabel}
           node={props.node}
         >
           {null}

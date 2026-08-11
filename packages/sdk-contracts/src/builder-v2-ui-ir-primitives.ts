@@ -149,7 +149,16 @@ type NodeBase = {
   id: string;
   style?: Record<string, BuilderV2UiIrJsonValue>;
   source?: z.infer<typeof BuilderV2UiIrSourceRefSchema>;
-  accessibilityLabel?: string;
+  /**
+   * What a screen reader announces for this node.
+   *
+   * The same shape as visible text, and for the same reason: an accessibility
+   * label is user-facing copy. It was a plain string, which made a localized
+   * label impossible to express — the guidance asks for both a label on every
+   * interactive element and every user-facing string to come from the locale
+   * resources, and no code could satisfy both.
+   */
+  accessibilityLabel?: z.infer<typeof BuilderV2UiIrTextSchema>;
 };
 
 export type BuilderV2UiIrNode =
@@ -231,7 +240,7 @@ const CommonNodeSchema = z.object({
   id: UiIrIdSchema,
   style: BuilderV2UiIrStyleSchema.optional(),
   source: BuilderV2UiIrSourceRefSchema.optional(),
-  accessibilityLabel: z.string().trim().min(1).max(500).optional(),
+  accessibilityLabel: BuilderV2UiIrTextSchema.optional(),
 });
 
 export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
