@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Pressable, type PressableProps, type ViewStyle } from "react-native";
+import { Pressable, type ViewStyle } from "react-native";
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -11,6 +11,7 @@ import Animated, {
 import type { BuilderV2UiIrNode } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
 import type { UiIrRendererPorts } from "../ports/ui-ir-renderer";
+import { placeUiIrPressableStyles } from "../domain/ui-ir-pressable-styles";
 import { uiIrConditionHolds } from "../domain/ui-ir-state";
 import { useUiIrScreenState } from "./ui-ir-screen-state";
 
@@ -62,23 +63,20 @@ export function UiIrPressable(props: UiIrPressableProps) {
     }),
     [hasOpacityFeedback, hasScaleFeedback],
   );
-  /*
-   * The held appearance rides on the outer view, because that is where the
-   * node's own style lives — putting it on the inner Pressable would layer it
-   * over contentStyle instead, and a pressed background would land behind the
-   * wrong box.
-   */
   const [pressed, setPressed] = useState(false);
-  const heldStyle =
-    pressed && props.node.pressedStyle
-      ? asViewStyle(props.node.pressedStyle)
-      : undefined;
+  const placed = placeUiIrPressableStyles({
+    style: props.style ?? props.node.style,
+    pressedStyle: props.node.pressedStyle,
+    contentStyle: props.node.contentStyle,
+    pressed,
+  });
 
   return (
     <Animated.View
       style={[
-        asViewStyle(props.style ?? props.node.style),
-        heldStyle,
+        ...placed.container.map((style) =>
+          asViewStyle(style as PressableNode["style"]),
+        ),
         animatedStyle,
       ]}
     >
@@ -95,7 +93,9 @@ export function UiIrPressable(props: UiIrPressableProps) {
           setPressed(false);
           animateFeedback(props.node, scale, opacity, false);
         }}
-        style={asPressableStyle(props.node.contentStyle)}
+        style={placed.pressable.map((style) =>
+          asViewStyle(style as PressableNode["style"]),
+        )}
       >
         {props.children}
       </Pressable>
@@ -170,11 +170,5 @@ function animateFeedback(
 }
 
 function asViewStyle(style: PressableNode["style"]): ViewStyle | undefined {
-  return style as ViewStyle | undefined;
-}
-
-function asPressableStyle(
-  style: PressableNode["contentStyle"],
-): PressableProps["style"] {
   return style as ViewStyle | undefined;
 }
