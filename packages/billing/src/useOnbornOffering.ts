@@ -19,6 +19,11 @@ import type {
 } from "./types";
 
 export type UseOnbornOfferingOptions = {
+  /**
+   * Which dashboard offering to load. Omitted means the environment's current
+   * one, which is what every caller got before paywalls could choose.
+   */
+  offeringKey?: string;
   initialPackageId?: string;
   billingAdapter?: OnbornBillingAdapter;
   onPurchaseStarted?: (item: OnbornPackageWithProduct) => void;
@@ -61,9 +66,12 @@ export function useOnbornOffering(
   const client = useMemo(
     () =>
       createBillingClient({
-        sourceId: "offering:current",
+        sourceId: runtimeOptions.offeringKey
+          ? `offering:${runtimeOptions.offeringKey}`
+          : "offering:current",
       }),
     [
+      runtimeOptions.offeringKey,
       runtimeOptions.apiKey,
       runtimeOptions.appId,
       runtimeOptions.appVersion,
@@ -100,7 +108,7 @@ export function useOnbornOffering(
     setLoading(true);
     setError(null);
     try {
-      const response = await client.loadOffering();
+      const response = await client.loadOffering(runtimeOptions.offeringKey);
       // Store localization is an enhancement, not a precondition. The native
       // store connection can be cold or briefly unavailable (app resumed,
       // StoreKit reconnecting), and treating that as fatal blanked an offering
@@ -141,6 +149,7 @@ export function useOnbornOffering(
   }, [
     client,
     runtimeOptions.billingAdapter,
+    runtimeOptions.offeringKey,
     runtimeOptions.userId,
   ]);
 

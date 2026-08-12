@@ -25,8 +25,14 @@ export const BaseEventSchema = z.object({
   runtimeSource: z.literal("builder_v2").optional(),
   runtimeVersion: z.string().optional(),
   runtimeTarget: z.enum(["ios", "android", "web"]).optional(),
-  artifactId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  releaseId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  artifactId: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  releaseId: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
 });
 
 export const FlowStartedEventSchema = BaseEventSchema.extend({

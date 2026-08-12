@@ -33,10 +33,7 @@ export const BuilderV2PhosphorIconWeightSchema = z.enum([
 
 export const BuilderV2ArtifactPhosphorIconsSchema =
   BuilderV2ProjectPhosphorIconsSchema.extend({
-    imports: z
-      .array(BuilderV2PhosphorIconExportNameSchema)
-      .min(1)
-      .max(2_000),
+    imports: z.array(BuilderV2PhosphorIconExportNameSchema).min(1).max(2_000),
   })
     .strict()
     .superRefine((icons, context) => {

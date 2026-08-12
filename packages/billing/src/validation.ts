@@ -98,7 +98,9 @@ function createPurchaseIdempotencyKey(
   ].join(":");
 }
 
-function fingerprintIdempotencyValue(value: string | undefined): string | undefined {
+function fingerprintIdempotencyValue(
+  value: string | undefined,
+): string | undefined {
   if (!value) return undefined;
 
   let first = 0x811c9dc5;

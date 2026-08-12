@@ -55,7 +55,8 @@ export const GetSdkPaywallResponseSchema = GetPaywallResponseSchema;
 export const GetSdkOfferingResponseSchema = GetOfferingResponseSchema;
 export const ValidateSdkPurchaseResponseSchema =
   PurchaseValidationResponseSchema;
-export const RestoreSdkPurchasesResponseSchema = PurchaseValidationResponseSchema;
+export const RestoreSdkPurchasesResponseSchema =
+  PurchaseValidationResponseSchema;
 export const GetSdkCustomerEntitlementsResponseSchema =
   CustomerEntitlementsResponseSchema;
 

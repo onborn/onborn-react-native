@@ -257,9 +257,7 @@ export const PAYWALL_LAYOUT_PRESET_VALUES = [
   "split",
 ] as const;
 
-export const PaywallLayoutPresetSchema = z.enum(
-  PAYWALL_LAYOUT_PRESET_VALUES,
-);
+export const PaywallLayoutPresetSchema = z.enum(PAYWALL_LAYOUT_PRESET_VALUES);
 
 export const PaywallLayoutConfigSchema = z
   .object({

@@ -34,6 +34,14 @@ export type UiIrActionRuntimePorts = {
       nodeId: string;
     }): void | Promise<void>;
   };
+  /** Opens the terms and privacy documents a paywall is required to link. */
+  links?: {
+    open(input: {
+      url: string;
+      screenId: string;
+      nodeId: string;
+    }): void | Promise<void>;
+  };
 };
 
 export class UiIrRuntimeCapabilityUnavailableError extends Error {

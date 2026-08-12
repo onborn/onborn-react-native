@@ -5,10 +5,7 @@ import type { IconProps } from "phosphor-react-native";
 
 import type { BuilderV2UiIrNode } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
-type PhosphorIconNode = Extract<
-  BuilderV2UiIrNode,
-  { type: "phosphor-icon" }
->;
+type PhosphorIconNode = Extract<BuilderV2UiIrNode, { type: "phosphor-icon" }>;
 
 const iconRegistry = PhosphorIcons as unknown as Readonly<
   Record<string, ComponentType<IconProps> | undefined>

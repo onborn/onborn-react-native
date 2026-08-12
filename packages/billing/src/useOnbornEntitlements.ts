@@ -73,38 +73,39 @@ export function useOnbornEntitlements(
     : null;
   const storage = options.cache ? runtimeOptions.analyticsStorage : undefined;
 
-  const reload = useCallback(async (): Promise<CustomerEntitlementsResponse> => {
-    const seq = (requestSeqRef.current += 1);
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await client.loadCustomerEntitlements();
-      // Superseded by a newer reload while this one was in flight: return the
-      // value to this specific caller but do not let it become the shared
-      // state, so a pre-purchase read can't clobber a post-purchase one.
-      if (seq !== requestSeqRef.current) {
+  const reload =
+    useCallback(async (): Promise<CustomerEntitlementsResponse> => {
+      const seq = (requestSeqRef.current += 1);
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await client.loadCustomerEntitlements();
+        // Superseded by a newer reload while this one was in flight: return the
+        // value to this specific caller but do not let it become the shared
+        // state, so a pre-purchase read can't clobber a post-purchase one.
+        if (seq !== requestSeqRef.current) {
+          return response;
+        }
+        freshRef.current = true;
+        setData(response);
+        setStale(false);
+        if (storage && cacheKey) {
+          void storage
+            .setItem(cacheKey, JSON.stringify(response))
+            .catch(() => undefined);
+        }
         return response;
+      } catch (loadError) {
+        if (seq === requestSeqRef.current) {
+          setError(toError(loadError).message);
+        }
+        throw loadError;
+      } finally {
+        if (seq === requestSeqRef.current) {
+          setLoading(false);
+        }
       }
-      freshRef.current = true;
-      setData(response);
-      setStale(false);
-      if (storage && cacheKey) {
-        void storage
-          .setItem(cacheKey, JSON.stringify(response))
-          .catch(() => undefined);
-      }
-      return response;
-    } catch (loadError) {
-      if (seq === requestSeqRef.current) {
-        setError(toError(loadError).message);
-      }
-      throw loadError;
-    } finally {
-      if (seq === requestSeqRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [cacheKey, client, storage]);
+    }, [cacheKey, client, storage]);
 
   useEffect(() => {
     if (!storage || !cacheKey) {

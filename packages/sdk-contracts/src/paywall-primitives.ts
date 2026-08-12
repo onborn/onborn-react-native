@@ -458,9 +458,15 @@ function readComponentBgProp(
   if (record.type === "blur") {
     return {
       type: "blur",
-      ...(typeof record.intensity === "number" ? { intensity: record.intensity } : {}),
-      ...(typeof record.tintColor === "string" ? { tintColor: record.tintColor } : {}),
-      ...(typeof record.opacity === "number" ? { opacity: record.opacity } : {}),
+      ...(typeof record.intensity === "number"
+        ? { intensity: record.intensity }
+        : {}),
+      ...(typeof record.tintColor === "string"
+        ? { tintColor: record.tintColor }
+        : {}),
+      ...(typeof record.opacity === "number"
+        ? { opacity: record.opacity }
+        : {}),
     };
   }
   return undefined;

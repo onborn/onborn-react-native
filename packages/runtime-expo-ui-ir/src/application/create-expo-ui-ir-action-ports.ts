@@ -12,6 +12,8 @@ export function createExpoUiIrActionPorts(input: {
   analytics?: ExpoUiIrAnalyticsPort;
   billing?: ExpoUiIrBillingPort;
   capabilities?: ExpoUiIrCapabilityPort;
+  /** Overridable for tests; defaults to React Native's Linking. */
+  openUrl?: (url: string) => Promise<unknown>;
 }): ActionPorts {
   return {
     ...(input.analytics ? { analytics: input.analytics } : {}),
@@ -25,7 +27,33 @@ export function createExpoUiIrActionPorts(input: {
           },
         }
       : {}),
+    /*
+     * Always present: a paywall is required to link its terms and privacy
+     * documents, so a host that could not open a URL would be a host no
+     * compliant paywall could run on. The URL was resolved and validated at
+     * publish time, so there is nothing to check here.
+     */
+    links: {
+      open: (invocation) => openUrl(invocation.url, input.openUrl),
+    },
   };
+}
+
+/*
+ * React Native is imported only when a link is actually opened. Importing it at
+ * module scope pulls its Flow-typed entry point into every consumer, which the
+ * node test runner cannot parse — the same trap the font loader hit.
+ */
+async function openUrl(
+  url: string,
+  override?: (url: string) => Promise<unknown>,
+): Promise<void> {
+  if (override) {
+    await override(url);
+    return;
+  }
+  const { Linking } = await import("react-native");
+  await Linking.openURL(url);
 }
 
 function createBillingActions(
@@ -104,9 +132,7 @@ function createBillingActions(
   };
 }
 
-function purchaseEvent(
-  status: "completed" | "pending" | "cancelled",
-): string {
+function purchaseEvent(status: "completed" | "pending" | "cancelled"): string {
   if (status === "completed") return "purchase_completed";
   if (status === "pending") return "purchase_pending";
   return "purchase_cancelled";

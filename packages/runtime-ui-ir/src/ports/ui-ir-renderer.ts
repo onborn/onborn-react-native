@@ -12,6 +12,19 @@ export type UiIrActionContext = {
   screenId: string;
   nodeId: string;
   action: BuilderV2UiIrAction;
+  /**
+   * Turns the plan an artifact names into the product the store sells.
+   *
+   * Supplied by the pressable, which is the only place that knows both the
+   * loaded offering and the screen's current selection. Absent when nothing on
+   * the screen buys anything.
+   */
+  resolvePurchaseTarget?: (
+    source: Extract<
+      BuilderV2UiIrAction,
+      { type: "billing.purchase" }
+    >["source"],
+  ) => string | undefined;
 };
 
 export type UiIrCapabilityRenderInput = {

@@ -12,10 +12,7 @@ import {
 } from "expo-iap";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
-import type {
-  BillingPeriod,
-  BillingProductOffer,
-} from "@onborn/sdk-contracts";
+import type { BillingPeriod, BillingProductOffer } from "@onborn/sdk-contracts";
 import { createNativeStoresBillingAdapter } from "./adapters/nativeStores";
 import {
   isUserCancelledError,
@@ -327,18 +324,14 @@ export function useExpoIapBillingAdapter(
   const reloadProducts = useCallback(
     async (productIds = options.productIds ?? []) => {
       const normalizedIds = normalizeIds(productIds);
-      return normalizedIds.length > 0
-        ? loadProducts(normalizedIds, true)
-        : [];
+      return normalizedIds.length > 0 ? loadProducts(normalizedIds, true) : [];
     },
     [loadProducts, options.productIds],
   );
 
   const recoverPurchase = useCallback(
     async (productId: string): Promise<Purchase | null> => {
-      await wait(
-        options.purchaseRecoveryDelayMs ?? DEFAULT_RECOVERY_DELAY_MS,
-      );
+      await wait(options.purchaseRecoveryDelayMs ?? DEFAULT_RECOVERY_DELAY_MS);
       try {
         const availablePurchases = await getAvailablePurchases({
           onlyIncludeActiveItemsIOS: true,
@@ -351,84 +344,60 @@ export function useExpoIapBillingAdapter(
     [options.purchaseRecoveryDelayMs],
   );
 
-  const billingAdapter = useMemo(
-    () => {
-      const nativeAdapter = createNativeStoresBillingAdapter({
-        async loadProducts({ storeProductIds }) {
-          const nativeProducts = await loadProducts(storeProductIds);
-          const eligibility = await resolveIntroOfferEligibility(nativeProducts);
-          return nativeProducts.map((product) =>
-            normalizeStoreProduct(product, eligibility),
-          );
-        },
-        async purchaseProduct({ storeProductId }) {
-          await waitForConnection();
-          if (pendingPurchaseRef.current) {
-            throw new Error("Another purchase is already in progress.");
-          }
+  const billingAdapter = useMemo(() => {
+    const nativeAdapter = createNativeStoresBillingAdapter({
+      async loadProducts({ storeProductIds }) {
+        const nativeProducts = await loadProducts(storeProductIds);
+        const eligibility = await resolveIntroOfferEligibility(nativeProducts);
+        return nativeProducts.map((product) =>
+          normalizeStoreProduct(product, eligibility),
+        );
+      },
+      async purchaseProduct({ storeProductId }) {
+        await waitForConnection();
+        if (pendingPurchaseRef.current) {
+          throw new Error("Another purchase is already in progress.");
+        }
 
-          knownProductIdsRef.current.add(storeProductId);
-          const purchase = await new Promise<Purchase>((resolve, reject) => {
-            const timeout = setTimeout(() => {
-              settlePendingPurchase((item) =>
-                item.reject(new Error("Purchase timed out.")),
-              );
-            }, options.purchaseTimeoutMs ?? DEFAULT_PURCHASE_TIMEOUT_MS);
+        knownProductIdsRef.current.add(storeProductId);
+        const purchase = await new Promise<Purchase>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            settlePendingPurchase((item) =>
+              item.reject(new Error("Purchase timed out.")),
+            );
+          }, options.purchaseTimeoutMs ?? DEFAULT_PURCHASE_TIMEOUT_MS);
 
-            pendingPurchaseRef.current = {
-              productId: storeProductId,
-              resolve,
-              reject,
-              timeout,
-              dispatching: true,
-            };
+          pendingPurchaseRef.current = {
+            productId: storeProductId,
+            resolve,
+            reject,
+            timeout,
+            dispatching: true,
+          };
 
-            void (async () => {
-              try {
-                const result = await requestPurchase({
-                  request:
-                    Platform.OS === "android"
-                      ? { google: { skus: [storeProductId] } }
-                      : { apple: { sku: storeProductId } },
-                  type: "subs",
-                });
-                const item = pendingPurchaseRef.current;
-                if (!item || item.productId !== storeProductId) return;
-                item.dispatching = false;
+          void (async () => {
+            try {
+              const result = await requestPurchase({
+                request:
+                  Platform.OS === "android"
+                    ? { google: { skus: [storeProductId] } }
+                    : { apple: { sku: storeProductId } },
+                type: "subs",
+              });
+              const item = pendingPurchaseRef.current;
+              if (!item || item.productId !== storeProductId) return;
+              item.dispatching = false;
 
-                const successfulPurchase =
-                  findPurchase(result, storeProductId) ?? item.bufferedPurchase;
-                if (successfulPurchase) {
-                  settlePendingPurchase((current) =>
-                    current.resolve(successfulPurchase),
-                  );
-                  return;
-                }
-                if (item.bufferedError) {
-                  const recovered = isUserCancelledError(item.bufferedError)
-                    ? await recoverPurchase(storeProductId)
-                    : null;
-                  if (recovered && pendingPurchaseRef.current === item) {
-                    settlePendingPurchase((current) =>
-                      current.resolve(recovered),
-                    );
-                  } else if (pendingPurchaseRef.current === item) {
-                    settlePendingPurchase((current) =>
-                      current.reject(item.bufferedError!),
-                    );
-                  }
-                }
-              } catch (error) {
-                const item = pendingPurchaseRef.current;
-                if (!item || item.productId !== storeProductId) return;
-                item.dispatching = false;
-                if (item.bufferedPurchase) {
-                  settlePendingPurchase((current) =>
-                    current.resolve(item.bufferedPurchase!),
-                  );
-                  return;
-                }
-                const recovered = isUserCancelledError(error)
+              const successfulPurchase =
+                findPurchase(result, storeProductId) ?? item.bufferedPurchase;
+              if (successfulPurchase) {
+                settlePendingPurchase((current) =>
+                  current.resolve(successfulPurchase),
+                );
+                return;
+              }
+              if (item.bufferedError) {
+                const recovered = isUserCancelledError(item.bufferedError)
                   ? await recoverPurchase(storeProductId)
                   : null;
                 if (recovered && pendingPurchaseRef.current === item) {
@@ -437,123 +406,142 @@ export function useExpoIapBillingAdapter(
                   );
                 } else if (pendingPurchaseRef.current === item) {
                   settlePendingPurchase((current) =>
-                    current.reject(
-                      normalizeError(error, "Unable to start purchase."),
-                    ),
+                    current.reject(item.bufferedError!),
                   );
                 }
               }
-            })();
-          });
+            } catch (error) {
+              const item = pendingPurchaseRef.current;
+              if (!item || item.productId !== storeProductId) return;
+              item.dispatching = false;
+              if (item.bufferedPurchase) {
+                settlePendingPurchase((current) =>
+                  current.resolve(item.bufferedPurchase!),
+                );
+                return;
+              }
+              const recovered = isUserCancelledError(error)
+                ? await recoverPurchase(storeProductId)
+                : null;
+              if (recovered && pendingPurchaseRef.current === item) {
+                settlePendingPurchase((current) => current.resolve(recovered));
+              } else if (pendingPurchaseRef.current === item) {
+                settlePendingPurchase((current) =>
+                  current.reject(
+                    normalizeError(error, "Unable to start purchase."),
+                  ),
+                );
+              }
+            }
+          })();
+        });
 
-          return normalizeStorePurchase(purchase);
-        },
-        async restorePurchases({ products: configuredProducts }) {
-          await waitForConnection();
-          const subscriptionIds = normalizeIds([
-            ...configuredProducts.map((product) => product.storeProductId),
-            ...knownProductIdsRef.current,
-          ]);
+        return normalizeStorePurchase(purchase);
+      },
+      async restorePurchases({ products: configuredProducts }) {
+        await waitForConnection();
+        const subscriptionIds = normalizeIds([
+          ...configuredProducts.map((product) => product.storeProductId),
+          ...knownProductIdsRef.current,
+        ]);
 
-          await synchronizeStorePurchases();
-          await wait(
-            options.restoreSettleDelayMs ?? DEFAULT_RESTORE_SETTLE_DELAY_MS,
+        await synchronizeStorePurchases();
+        await wait(
+          options.restoreSettleDelayMs ?? DEFAULT_RESTORE_SETTLE_DELAY_MS,
+        );
+
+        const [availableResult, activeResult] = await Promise.allSettled([
+          getAvailablePurchases({ onlyIncludeActiveItemsIOS: true }),
+          getActiveSubscriptions(subscriptionIds),
+        ]);
+        if (
+          availableResult.status === "rejected" &&
+          activeResult.status === "rejected"
+        ) {
+          throw availableResult.reason;
+        }
+
+        const restoredPurchases = [
+          ...(availableResult.status === "fulfilled"
+            ? availableResult.value.map(normalizeRestoredPurchase)
+            : []),
+          ...(activeResult.status === "fulfilled"
+            ? activeResult.value
+                .filter((subscription) => subscription.isActive)
+                .map((subscription) => ({
+                  store:
+                    Platform.OS === "android"
+                      ? ("google_play" as const)
+                      : ("app_store" as const),
+                  storeProductId: subscription.productId,
+                  transactionId: subscription.transactionId,
+                  purchaseToken: subscription.purchaseToken ?? undefined,
+                  raw: subscription,
+                }))
+            : []),
+        ];
+
+        return {
+          purchases: deduplicateRestoredPurchases(restoredPurchases),
+          raw: {
+            availablePurchases:
+              availableResult.status === "fulfilled"
+                ? availableResult.value
+                : [],
+            activeSubscriptions:
+              activeResult.status === "fulfilled" ? activeResult.value : [],
+          },
+        };
+      },
+    });
+
+    return {
+      ...nativeAdapter,
+      async finalizePurchase(result: OnbornPurchaseResult) {
+        const purchase = findPurchase(result.raw, result.productId);
+        if (!purchase) return;
+        setTransactionError(null);
+        try {
+          await finishTransaction({ purchase, isConsumable: false });
+        } catch (error) {
+          setTransactionError(
+            normalizeError(error, "Unable to finish native transaction."),
           );
-
-          const [availableResult, activeResult] = await Promise.allSettled([
-            getAvailablePurchases({ onlyIncludeActiveItemsIOS: true }),
-            getActiveSubscriptions(subscriptionIds),
-          ]);
-          if (
-            availableResult.status === "rejected" &&
-            activeResult.status === "rejected"
-          ) {
-            throw availableResult.reason;
-          }
-
-          const restoredPurchases = [
-            ...(availableResult.status === "fulfilled"
-              ? availableResult.value.map(normalizeRestoredPurchase)
-              : []),
-            ...(activeResult.status === "fulfilled"
-              ? activeResult.value
-                  .filter((subscription) => subscription.isActive)
-                  .map((subscription) => ({
-                    store:
-                      Platform.OS === "android"
-                        ? ("google_play" as const)
-                        : ("app_store" as const),
-                    storeProductId: subscription.productId,
-                    transactionId: subscription.transactionId,
-                    purchaseToken: subscription.purchaseToken ?? undefined,
-                    raw: subscription,
-                  }))
-              : []),
-          ];
-
-          return {
-            purchases: deduplicateRestoredPurchases(restoredPurchases),
-            raw: {
-              availablePurchases:
-                availableResult.status === "fulfilled"
-                  ? availableResult.value
-                  : [],
-              activeSubscriptions:
-                activeResult.status === "fulfilled" ? activeResult.value : [],
-            },
-          };
-        },
-      });
-
-      return {
-        ...nativeAdapter,
-        async finalizePurchase(result: OnbornPurchaseResult) {
-          const purchase = findPurchase(result.raw, result.productId);
-          if (!purchase) return;
-          setTransactionError(null);
-          try {
-            await finishTransaction({ purchase, isConsumable: false });
-          } catch (error) {
-            setTransactionError(
-              normalizeError(error, "Unable to finish native transaction."),
-            );
-          }
-        },
-        async finalizeRestore(result: OnbornRestoreResult) {
-          const purchases = findPurchases(result.raw);
-          if (purchases.length === 0) return;
-          setTransactionError(null);
-          const outcomes = await Promise.allSettled(
-            purchases.map((purchase) =>
-              finishTransaction({ purchase, isConsumable: false }),
+        }
+      },
+      async finalizeRestore(result: OnbornRestoreResult) {
+        const purchases = findPurchases(result.raw);
+        if (purchases.length === 0) return;
+        setTransactionError(null);
+        const outcomes = await Promise.allSettled(
+          purchases.map((purchase) =>
+            finishTransaction({ purchase, isConsumable: false }),
+          ),
+        );
+        const failed = outcomes.find(
+          (outcome): outcome is PromiseRejectedResult =>
+            outcome.status === "rejected",
+        );
+        if (failed) {
+          setTransactionError(
+            normalizeError(
+              failed.reason,
+              "Unable to finish restored native transaction.",
             ),
           );
-          const failed = outcomes.find(
-            (outcome): outcome is PromiseRejectedResult =>
-              outcome.status === "rejected",
-          );
-          if (failed) {
-            setTransactionError(
-              normalizeError(
-                failed.reason,
-                "Unable to finish restored native transaction.",
-              ),
-            );
-          }
-        },
-      } satisfies OnbornBillingAdapter;
-    },
-    [
-      finishTransaction,
-      loadProducts,
-      options.purchaseTimeoutMs,
-      options.restoreSettleDelayMs,
-      recoverPurchase,
-      requestPurchase,
-      settlePendingPurchase,
-      waitForConnection,
-    ],
-  );
+        }
+      },
+    } satisfies OnbornBillingAdapter;
+  }, [
+    finishTransaction,
+    loadProducts,
+    options.purchaseTimeoutMs,
+    options.restoreSettleDelayMs,
+    recoverPurchase,
+    requestPurchase,
+    settlePendingPurchase,
+    waitForConnection,
+  ]);
 
   return {
     billingAdapter,
@@ -607,7 +595,7 @@ function normalizeStoreProduct(
     price: product.price ?? undefined,
     subscriptionPeriod:
       "subscriptionPeriodUnitIOS" in product
-        ? product.subscriptionPeriodUnitIOS ?? undefined
+        ? (product.subscriptionPeriodUnitIOS ?? undefined)
         : undefined,
     billingPeriod: readProductBillingPeriod(product),
     introOffer: readProductIntroOffer(product, offerEligibility),
@@ -798,7 +786,7 @@ function normalizeStorePurchase(purchase: Purchase) {
     purchaseToken: purchase.purchaseToken ?? undefined,
     originalTransactionIdentifierIOS:
       "originalTransactionIdentifierIOS" in purchase
-        ? purchase.originalTransactionIdentifierIOS ?? undefined
+        ? (purchase.originalTransactionIdentifierIOS ?? undefined)
         : undefined,
     raw: purchase,
   };
@@ -875,10 +863,7 @@ function collectPurchases(
   visited.add(value);
 
   if (isPurchase(value)) {
-    found.set(
-      `${value.productId}:${value.transactionId ?? value.id}`,
-      value,
-    );
+    found.set(`${value.productId}:${value.transactionId ?? value.id}`, value);
     return;
   }
   if (Array.isArray(value)) {
@@ -893,9 +878,9 @@ function collectPurchases(
 function isPurchase(value: unknown): value is Purchase {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      "productId" in value &&
-      "transactionDate" in value,
+    typeof value === "object" &&
+    "productId" in value &&
+    "transactionDate" in value,
   );
 }
 

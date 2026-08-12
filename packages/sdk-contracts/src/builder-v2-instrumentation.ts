@@ -84,9 +84,7 @@ export const BuilderV2InstrumentationManifestSchema = z
     entryScreenId: InstrumentationIdSchema,
     screens: z.array(BuilderV2InstrumentedScreenSchema).max(1_000),
     nodes: z.array(BuilderV2InstrumentedNodeSchema).max(20_000),
-    interactions: z
-      .array(BuilderV2InstrumentedInteractionSchema)
-      .max(20_000),
+    interactions: z.array(BuilderV2InstrumentedInteractionSchema).max(20_000),
   })
   .strict()
   .superRefine((manifest, context) => {
@@ -96,12 +94,7 @@ export const BuilderV2InstrumentationManifestSchema = z
       "screens",
       context,
     );
-    addUniqueIdIssues(
-      manifest.nodes,
-      (node) => node.nodeId,
-      "nodes",
-      context,
-    );
+    addUniqueIdIssues(manifest.nodes, (node) => node.nodeId, "nodes", context);
     addUniqueIdIssues(
       manifest.interactions,
       (interaction) => interaction.interactionId,
@@ -181,9 +174,7 @@ function addUniqueIdIssues<T>(
   });
 }
 
-export type BuilderV2SourceRange = z.infer<
-  typeof BuilderV2SourceRangeSchema
->;
+export type BuilderV2SourceRange = z.infer<typeof BuilderV2SourceRangeSchema>;
 export type BuilderV2InstrumentedScreen = z.infer<
   typeof BuilderV2InstrumentedScreenSchema
 >;

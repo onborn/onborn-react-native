@@ -12,7 +12,9 @@ import type { BuilderV2UiIrNode } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
 import type { UiIrRendererPorts } from "../ports/ui-ir-renderer";
 import { placeUiIrPressableStyles } from "../domain/ui-ir-pressable-styles";
-import { uiIrConditionHolds } from "../domain/ui-ir-state";
+import { resolveUiIrPlan, type UiIrPlanSnapshot } from "../domain/ui-ir-plans";
+import { uiIrGateHolds } from "../domain/ui-ir-state";
+import { useUiIrPlans } from "./ui-ir-plans-context";
 import { useUiIrScreenState } from "./ui-ir-screen-state";
 
 type PressableNode = Extract<BuilderV2UiIrNode, { type: "pressable" }>;
@@ -40,13 +42,18 @@ export function UiIrPressable(props: UiIrPressableProps) {
   }, [opacity, props.node.feedback, scale]);
 
   const screenState = useUiIrScreenState();
+  const plans = useUiIrPlans();
   /*
    * Disabled may be a fact or a condition — "until something is selected". The
    * screen reader hears the same answer the touch system enforces.
    */
   const disabled =
     typeof props.node.disabled === "object"
-      ? uiIrConditionHolds(screenState.values, props.node.disabled)
+      ? uiIrGateHolds(props.node.disabled, {
+          values: screenState.values,
+          plans: plans.snapshot,
+          currentPlanIndex: plans.currentIndex,
+        })
       : (props.node.disabled ?? false);
   const common = {
     ...(props.accessibilityLabel
@@ -83,7 +90,15 @@ export function UiIrPressable(props: UiIrPressableProps) {
       <Pressable
         {...common}
         disabled={disabled}
-        onPress={() => handlePress(props, screenState.set)}
+        onPress={() =>
+          handlePress(props, screenState.set, (source) =>
+            resolvePurchaseTarget(source, {
+              plans: plans.snapshot,
+              currentIndex: plans.currentIndex,
+              values: screenState.values,
+            }),
+          )
+        }
         onPressIn={() => {
           setPressed(true);
           animateFeedback(props.node, scale, opacity, true);
@@ -106,6 +121,12 @@ export function UiIrPressable(props: UiIrPressableProps) {
 function handlePress(
   props: UiIrPressableProps,
   setState: (state: string, value: string | null) => void,
+  resolvePurchaseTarget: (
+    source: Extract<
+      PressableNode["action"],
+      { type: "billing.purchase" }
+    >["source"],
+  ) => string | undefined,
 ): void {
   /*
    * Selection is the screen's own affair; it never leaves the device, so it is
@@ -119,7 +140,40 @@ function handlePress(
     screenId: props.screenId,
     nodeId: props.node.id,
     action: props.node.action,
+    resolvePurchaseTarget,
   });
+}
+
+/**
+ * The product a purchase button buys, at the moment it is pressed.
+ *
+ * A selection holds a slot as a string — the only shape screen state has — so
+ * a plan chosen by tapping a row and a plan named by position resolve through
+ * the same path. Anything unresolvable returns nothing, and the action handler
+ * refuses rather than buying an arbitrary product.
+ */
+function resolvePurchaseTarget(
+  source: Extract<
+    PressableNode["action"],
+    { type: "billing.purchase" }
+  >["source"],
+  context: {
+    plans: UiIrPlanSnapshot;
+    currentIndex: number | null;
+    values: Readonly<Record<string, string | null>>;
+  },
+): string | undefined {
+  if ("packageId" in source) return source.packageId;
+  if ("plan" in source) {
+    return resolveUiIrPlan(context.plans, source.plan, context.currentIndex)
+      ?.id;
+  }
+  const selected = context.values[source.planFromState];
+  if (selected === null || selected === undefined) return undefined;
+  const slot = Number.parseInt(selected, 10);
+  return Number.isInteger(slot)
+    ? resolveUiIrPlan(context.plans, { slot }, context.currentIndex)?.id
+    : context.plans.plans.find((plan) => plan.id === selected)?.id;
 }
 
 function triggerHaptic(props: UiIrPressableProps): void {

@@ -1,9 +1,5 @@
 import { useMemo, type PropsWithChildren } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  type ViewStyle,
-} from "react-native";
+import { SafeAreaView, ScrollView, type ViewStyle } from "react-native";
 import Reanimated from "react-native-reanimated";
 
 import type {
@@ -39,8 +35,14 @@ type UiIrAnimatedViewProps = PropsWithChildren<{
 
 export function UiIrAnimatedView(props: UiIrAnimatedViewProps) {
   if (props.enterTransition?.type === "timing") {
-    if (props.kind !== "view" || props.exitTransition || props.layoutTransition) {
-      throw new Error("Timing UI IR motion only supports a standalone View entrance.");
+    if (
+      props.kind !== "view" ||
+      props.exitTransition ||
+      props.layoutTransition
+    ) {
+      throw new Error(
+        "Timing UI IR motion only supports a standalone View entrance.",
+      );
     }
     return (
       <UiIrLegacyAnimatedView
@@ -85,10 +87,18 @@ function UiIrReanimatedContainer(props: UiIrAnimatedViewProps) {
     style: props.style as ViewStyle | undefined,
   };
   if (props.kind === "safe-area-view") {
-    return <ReanimatedSafeAreaView {...motionProps}>{props.children}</ReanimatedSafeAreaView>;
+    return (
+      <ReanimatedSafeAreaView {...motionProps}>
+        {props.children}
+      </ReanimatedSafeAreaView>
+    );
   }
   if (props.kind === "scroll-view") {
-    return <ReanimatedScrollView {...motionProps}>{props.children}</ReanimatedScrollView>;
+    return (
+      <ReanimatedScrollView {...motionProps}>
+        {props.children}
+      </ReanimatedScrollView>
+    );
   }
   return <Reanimated.View {...motionProps}>{props.children}</Reanimated.View>;
 }

@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type ReactElement,
-} from "react";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
 
 import type { BuilderV2UiIrDocument } from "@onborn/sdk-contracts";
 
@@ -14,6 +9,7 @@ import type {
 } from "../domain/ui-ir-journey";
 import type { UiIrActionRuntimePorts } from "../ports/ui-ir-action-runtime";
 import type { UiIrRendererPorts } from "../ports/ui-ir-renderer";
+import type { UiIrPlanSnapshot } from "../domain/ui-ir-plans";
 import { UiIrScreen } from "./ui-ir-screen";
 
 export type UiIrJourneyProps = {
@@ -22,6 +18,8 @@ export type UiIrJourneyProps = {
   controller: UiIrJourneyController;
   actionPorts: Omit<UiIrActionRuntimePorts, "journey">;
   rendererPorts: Omit<UiIrRendererPorts, "handleAction">;
+  /** The offering a paywall screen's price bindings read. */
+  plans?: UiIrPlanSnapshot;
 };
 
 export function UiIrJourney(props: UiIrJourneyProps): ReactElement {
@@ -51,6 +49,7 @@ export function UiIrJourney(props: UiIrJourneyProps): ReactElement {
     <UiIrScreen
       document={props.document}
       locale={props.locale}
+      plans={props.plans}
       ports={rendererPorts}
       screenId={journey.activeScreenId}
     />

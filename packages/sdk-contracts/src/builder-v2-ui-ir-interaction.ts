@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BuilderV2UiIrPlanConditionSchema } from "./builder-v2-ui-ir-billing";
 
 const BuilderV2UiIrPressMotionSchema = z
   .object({
@@ -61,4 +62,21 @@ export const BuilderV2UiIrStateConditionSchema = z
 
 export type BuilderV2UiIrStateCondition = z.infer<
   typeof BuilderV2UiIrStateConditionSchema
+>;
+
+/**
+ * Every predicate a runtime-dependent appearance may be gated on.
+ *
+ * Two kinds, both enumerable: a screen-local selection equals a known value, or
+ * a plan exists in the loaded offering. The second is what lets a paywall lay
+ * out three plans and show only the two the offering actually has, instead of
+ * rendering an empty row or inventing one.
+ */
+export const BuilderV2UiIrConditionSchema = z.union([
+  BuilderV2UiIrStateConditionSchema,
+  BuilderV2UiIrPlanConditionSchema,
+]);
+
+export type BuilderV2UiIrCondition = z.infer<
+  typeof BuilderV2UiIrConditionSchema
 >;

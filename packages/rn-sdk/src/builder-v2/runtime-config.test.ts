@@ -34,6 +34,7 @@ test("advertises only capabilities implemented by the public host runtime", () =
       "billing",
       "google-fonts",
       "image",
+      "linking",
       "localization",
       "navigation",
       "phosphor-icons",

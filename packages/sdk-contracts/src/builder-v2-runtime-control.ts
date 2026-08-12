@@ -34,12 +34,22 @@ export const BuilderV2RuntimeHealthEventSchema = z
     environment: z.enum(["test", "prod"]),
     target: BuilderV2MobileRuntimeTargetSchema,
     occurredAt: z.string().datetime(),
-    durationMs: z.number().int().min(0).max(15 * 60 * 1000),
+    durationMs: z
+      .number()
+      .int()
+      .min(0)
+      .max(15 * 60 * 1000),
     source: z
       .enum(["network", "last-known-good", "session-pinned", "cache-current"])
       .optional(),
-    artifactId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-    releaseId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    artifactId: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    releaseId: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     failureCode: z.string().trim().min(1).max(80).optional(),
     fallbackUsed: z.boolean().optional(),
   })

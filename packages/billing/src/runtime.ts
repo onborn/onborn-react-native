@@ -1,7 +1,4 @@
-import {
-  Onborn,
-  type OnbornConfig,
-} from "@onborn/analytics";
+import { Onborn, type OnbornConfig } from "@onborn/analytics";
 
 const GLOBAL_CONFIG_KEYS = [
   "apiKey",

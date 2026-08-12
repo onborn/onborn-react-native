@@ -25,6 +25,14 @@ export function resolveUiIrText(
   if (text.kind === "literal") {
     return text.value;
   }
+  /*
+   * A price is not the document's to answer: it comes from the offering the
+   * device loaded, so it is resolved where the plans are. Returning empty here
+   * keeps every caller honest rather than letting one invent a placeholder.
+   */
+  if (text.kind === "billing") {
+    return "";
+  }
   const localization = document.localization;
   if (!localization) {
     return text.fallback;

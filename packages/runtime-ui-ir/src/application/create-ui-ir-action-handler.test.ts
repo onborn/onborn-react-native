@@ -31,15 +31,19 @@ describe("UI IR action handler", () => {
     });
 
     await handler(context({ type: "navigation.next" }));
-    await handler(context({
-      type: "billing.purchase",
-      packageId: "yearly",
-    }));
-    await handler(context({
-      type: "capability.invoke",
-      capability: "camera",
-      method: "capture",
-    }));
+    await handler(
+      context({
+        type: "billing.purchase",
+        source: { packageId: "yearly" },
+      }),
+    );
+    await handler(
+      context({
+        type: "capability.invoke",
+        capability: "camera",
+        method: "capture",
+      }),
+    );
 
     assert.deepEqual(calls, [
       "analytics:ui_interaction",
@@ -61,11 +65,18 @@ describe("UI IR action handler", () => {
 });
 
 function context(
-  action: Parameters<
-    ReturnType<typeof createUiIrActionHandler>
-  >[0]["action"],
+  action: Parameters<ReturnType<typeof createUiIrActionHandler>>[0]["action"],
 ) {
-  return { screenId: "welcome", nodeId: "cta", action };
+  return {
+    screenId: "welcome",
+    nodeId: "cta",
+    action,
+    // Supplied by the pressable in the real renderer, which is the only place
+    // that knows both the loaded offering and the screen's selection.
+    resolvePurchaseTarget: (
+      source: Extract<typeof action, { type: "billing.purchase" }>["source"],
+    ) => ("packageId" in source ? source.packageId : undefined),
+  };
 }
 
 function journey(calls: string[]): UiIrJourneyController {

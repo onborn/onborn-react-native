@@ -15,6 +15,7 @@ export const BuilderV2CapabilityNameSchema = z.enum([
   "google-fonts",
   "haptics",
   "image",
+  "linking",
   "localization",
   "lottie",
   "navigation",

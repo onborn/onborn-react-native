@@ -68,9 +68,24 @@ export class BillingClient {
     return parsed.data;
   }
 
-  async loadOffering(): Promise<GetOfferingResponse> {
-    const url = this.runtimeUrl("/offerings/current");
-    const payload = await this.getJson(url, "current offering");
+  /**
+   * Loads the offering a paywall names, or the environment's current one.
+   *
+   * A named offering that does not exist fails rather than falling back: the
+   * flow asked to sell something specific, and quietly charging for the
+   * current offering's plans instead would be the wrong products at the wrong
+   * prices.
+   */
+  async loadOffering(key?: string): Promise<GetOfferingResponse> {
+    const url = this.runtimeUrl(
+      key
+        ? `/offerings/current?key=${encodeURIComponent(key)}`
+        : "/offerings/current",
+    );
+    const payload = await this.getJson(
+      url,
+      key ? `offering '${key}'` : "current offering",
+    );
     const parsed = GetOfferingResponseSchema.safeParse(payload);
     if (!parsed.success) {
       throw new Error("Invalid offering response payload");
@@ -223,8 +238,7 @@ export class BillingClient {
       flowId: this.options.sourceId ?? "billing",
       // Paywall events name themselves from the paywall they were loaded for,
       // so billing works without the host app configuring anything.
-      flowName:
-        this.loadedPaywallName ?? this.options.paywallName ?? "Paywall",
+      flowName: this.loadedPaywallName ?? this.options.paywallName ?? "Paywall",
       userId: this.userId,
     } as TrackEventInput);
   }
@@ -268,11 +282,7 @@ export function createBillingClient(
   return new BillingClient(options);
 }
 
-function appendParam(
-  url: URL,
-  key: string,
-  value: string | undefined,
-): void {
+function appendParam(url: URL, key: string, value: string | undefined): void {
   if (value) {
     url.searchParams.set(key, value);
   }

@@ -19,7 +19,10 @@ type UiIrLegacyAnimatedViewProps = PropsWithChildren<{
 
 export function UiIrLegacyAnimatedView(props: UiIrLegacyAnimatedViewProps) {
   const values = useMemo(
-    () => props.transition.animations.map((animation) => new Animated.Value(animation.from)),
+    () =>
+      props.transition.animations.map(
+        (animation) => new Animated.Value(animation.from),
+      ),
     [props.transition],
   );
 
@@ -40,7 +43,10 @@ export function UiIrLegacyAnimatedView(props: UiIrLegacyAnimatedViewProps) {
   return (
     <Animated.View
       accessibilityLabel={props.accessibilityLabel}
-      style={[props.style as ViewStyle | undefined, createAnimatedStyle(props.transition, values)]}
+      style={[
+        props.style as ViewStyle | undefined,
+        createAnimatedStyle(props.transition, values),
+      ]}
     >
       {props.children}
     </Animated.View>
@@ -56,8 +62,10 @@ function createAnimatedStyle(
   transition.animations.forEach((animation, index) => {
     const value = values[index]!;
     if (animation.property === "opacity") style.opacity = value;
-    if (animation.property === "translateX") transform.push({ translateX: value });
-    if (animation.property === "translateY") transform.push({ translateY: value });
+    if (animation.property === "translateX")
+      transform.push({ translateX: value });
+    if (animation.property === "translateY")
+      transform.push({ translateY: value });
     if (animation.property === "scale") transform.push({ scale: value });
   });
   if (transform.length > 0) style.transform = transform;

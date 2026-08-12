@@ -100,9 +100,7 @@ export async function createExpoUiIrRuntimeSession(
       artifact: refreshed.artifact,
       document,
       source: refreshed.source,
-      ...(refreshed.failureCode
-        ? { failureCode: refreshed.failureCode }
-        : {}),
+      ...(refreshed.failureCode ? { failureCode: refreshed.failureCode } : {}),
     });
   const controller = createUiIrJourneyController({
     document,
@@ -123,9 +121,7 @@ export async function createExpoUiIrRuntimeSession(
     artifact: refreshed.artifact,
     document,
     source: refreshed.source,
-    ...(refreshed.failureCode
-      ? { failureCode: refreshed.failureCode }
-      : {}),
+    ...(refreshed.failureCode ? { failureCode: refreshed.failureCode } : {}),
     controller,
     actionPorts: createExpoUiIrActionPorts({
       analytics,

@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useState,
-  type ReactElement,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -12,6 +7,7 @@ import {
   type ExpoUiIrRuntimeSessionDependencies,
   type ExpoUiIrRuntimeSessionInput,
 } from "../application/create-expo-ui-ir-runtime-session";
+import type { UiIrPlanSnapshot } from "@onborn/runtime-ui-ir";
 import { ExpoUiIrFlow } from "./expo-ui-ir-flow";
 
 export type ExpoUiIrRemoteFlowProps = {
@@ -21,6 +17,8 @@ export type ExpoUiIrRemoteFlowProps = {
   renderLoading?: () => ReactNode;
   renderError?: (error: Error, retry: () => void) => ReactNode;
   onSessionReady?: (session: ExpoUiIrRuntimeSession) => void;
+  /** The offering a paywall screen's price bindings read. */
+  plans?: UiIrPlanSnapshot;
 };
 
 type RemoteFlowState =
@@ -52,12 +50,7 @@ export function ExpoUiIrRemoteFlow(
     return () => {
       cancelled = true;
     };
-  }, [
-    attempt,
-    props.dependencies,
-    props.input,
-    props.onSessionReady,
-  ]);
+  }, [attempt, props.dependencies, props.input, props.onSessionReady]);
 
   if (state.status === "loading") {
     return (
@@ -82,7 +75,13 @@ export function ExpoUiIrRemoteFlow(
       </>
     );
   }
-  return <ExpoUiIrFlow session={state.session} locale={props.locale} />;
+  return (
+    <ExpoUiIrFlow
+      session={state.session}
+      locale={props.locale}
+      plans={props.plans}
+    />
+  );
 }
 
 function normalizeError(error: unknown): Error {

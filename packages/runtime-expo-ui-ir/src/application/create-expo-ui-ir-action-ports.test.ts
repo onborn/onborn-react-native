@@ -54,15 +54,12 @@ describe("createExpoUiIrActionPorts", () => {
     });
 
     assert.ok(ports.billing);
-    await assert.rejects(
-      async () => {
-        await ports.billing!.restore({
-          screenId: "paywall",
-          nodeId: "paywall.restore",
-        });
-      },
-      failure,
-    );
+    await assert.rejects(async () => {
+      await ports.billing!.restore({
+        screenId: "paywall",
+        nodeId: "paywall.restore",
+      });
+    }, failure);
     assert.deepEqual(events, ["restore_started", "restore_failed"]);
   });
 

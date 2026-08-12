@@ -8,6 +8,8 @@ export * from "./components/ui-ir-screen";
 export * from "./domain/ui-ir-artifact-errors";
 export * from "./domain/ui-ir-document";
 export * from "./domain/ui-ir-journey";
+export * from "./domain/ui-ir-offering";
+export * from "./domain/ui-ir-plans";
 export * from "./infrastructure/http-ui-ir-artifact-delivery";
 export * from "./infrastructure/http-ui-ir-runtime-control";
 export * from "./infrastructure/http-ui-ir-runtime-diagnostics";

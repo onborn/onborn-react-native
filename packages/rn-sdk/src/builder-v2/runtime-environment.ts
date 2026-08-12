@@ -2,8 +2,7 @@ import type { BuilderV2ArtifactTarget } from "@onborn/sdk-contracts";
 
 export type BuilderV2RuntimeEnvironment = "test" | "prod";
 
-export const ONBORN_BUILDER_V2_API_BASE_URL =
-  "https://api.testing.onborn.app";
+export const ONBORN_BUILDER_V2_API_BASE_URL = "https://api.testing.onborn.app";
 
 export function resolveBuilderV2Environment(
   apiKey: string,

@@ -21,9 +21,7 @@ export const BuilderV2NativeCapabilityRegistrationSchema = z
 export const BuilderV2NativeCapabilityDeclarationSchema = z
   .object({
     schemaVersion: z.literal(1),
-    capabilities: z
-      .array(BuilderV2NativeCapabilityRegistrationSchema)
-      .max(32),
+    capabilities: z.array(BuilderV2NativeCapabilityRegistrationSchema).max(32),
   })
   .strict()
   .superRefine((declaration, context) => {

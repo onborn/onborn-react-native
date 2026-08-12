@@ -8,12 +8,10 @@ type AnyFunction = (...args: never[]) => unknown;
 
 type FunctionKeys<T> = {
   [Key in keyof T]-?: NonNullable<T[Key]> extends AnyFunction ? Key : never;
-}[keyof T] & string;
+}[keyof T] &
+  string;
 
-type RuntimeGroupKeys = Exclude<
-  keyof BuilderV2RuntimeCapabilities,
-  "version"
->;
+type RuntimeGroupKeys = Exclude<keyof BuilderV2RuntimeCapabilities, "version">;
 
 type RuntimeMethodDescription = {
   readonly signature: string;
@@ -67,8 +65,10 @@ export const BUILDER_V2_RUNTIME_API_MANIFEST = {
       required: true,
       methods: {
         trigger: {
-          signature: "runtime.interactions.trigger(interactionId: string): void",
-          description: "Record a declared interaction without wrapping a handler.",
+          signature:
+            "runtime.interactions.trigger(interactionId: string): void",
+          description:
+            "Record a declared interaction without wrapping a handler.",
         },
         wrap: {
           signature:
@@ -87,7 +87,8 @@ export const BUILDER_V2_RUNTIME_API_MANIFEST = {
         subscribe: {
           signature:
             "runtime.localization?.subscribe(listener: () => void): () => void",
-          description: "Observe locale changes and return an unsubscribe function.",
+          description:
+            "Observe locale changes and return an unsubscribe function.",
         },
       },
     },
@@ -95,13 +96,16 @@ export const BUILDER_V2_RUNTIME_API_MANIFEST = {
       required: false,
       methods: {
         getSnapshot: {
-          signature: "runtime.billing?.getSnapshot(): BuilderV2RuntimeBillingSnapshot",
-          description: "Read packages, selection, availability, and operation state.",
+          signature:
+            "runtime.billing?.getSnapshot(): BuilderV2RuntimeBillingSnapshot",
+          description:
+            "Read packages, selection, availability, and operation state.",
         },
         subscribe: {
           signature:
             "runtime.billing?.subscribe(listener: () => void): () => void",
-          description: "Observe billing state and return an unsubscribe function.",
+          description:
+            "Observe billing state and return an unsubscribe function.",
         },
         reload: {
           signature: "runtime.billing?.reload(): Promise<void>",
@@ -165,7 +169,8 @@ export const BUILDER_V2_RUNTIME_API_MANIFEST = {
         schedule: {
           signature:
             "runtime.notifications?.schedule(input): Promise<BuilderV2RuntimeNotificationScheduleResult>",
-          description: "Schedule a local notification using the declared input shape.",
+          description:
+            "Schedule a local notification using the declared input shape.",
         },
       },
     },

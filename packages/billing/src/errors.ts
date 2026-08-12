@@ -84,13 +84,17 @@ export function toOnbornPurchaseError(
     typeof record.message === "string" && record.message.trim()
       ? record.message
       : "The purchase could not be completed.";
-  return new OnbornPurchaseError(readStoreErrorCode(error) ?? "unknown", message, {
-    storeCode,
-    productId:
-      options?.productId ??
-      (typeof record.productId === "string" ? record.productId : undefined),
-    cause: error,
-  });
+  return new OnbornPurchaseError(
+    readStoreErrorCode(error) ?? "unknown",
+    message,
+    {
+      storeCode,
+      productId:
+        options?.productId ??
+        (typeof record.productId === "string" ? record.productId : undefined),
+      cause: error,
+    },
+  );
 }
 
 // expo-iap `ErrorCode` values, plus the shapes StoreKit/Play surface directly.
@@ -124,7 +128,9 @@ const STORE_ERROR_CODES: Record<string, OnbornPurchaseErrorCode> = {
   "developer-error": "not_allowed",
 };
 
-function readStoreErrorCode(error: unknown): OnbornPurchaseErrorCode | undefined {
+function readStoreErrorCode(
+  error: unknown,
+): OnbornPurchaseErrorCode | undefined {
   if (!error || typeof error !== "object") {
     return undefined;
   }

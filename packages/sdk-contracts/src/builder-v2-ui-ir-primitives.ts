@@ -11,10 +11,14 @@ import {
   BuilderV2UiIrLayoutTransitionSchema,
 } from "./builder-v2-ui-ir-motion";
 import {
+  BuilderV2UiIrPlanFieldSchema,
+  BuilderV2UiIrPlanRefSchema,
+} from "./builder-v2-ui-ir-billing";
+import {
+  BuilderV2UiIrConditionSchema,
   BuilderV2UiIrPressFeedbackSchema,
-  BuilderV2UiIrStateConditionSchema,
+  type BuilderV2UiIrCondition,
   type BuilderV2UiIrPressFeedback,
-  type BuilderV2UiIrStateCondition,
 } from "./builder-v2-ui-ir-interaction";
 import {
   BuilderV2UiIrVectorPaintSchema,
@@ -23,6 +27,7 @@ import {
   type BuilderV2UiIrVectorScalar,
 } from "./builder-v2-ui-ir-vector";
 
+export * from "./builder-v2-ui-ir-billing";
 export * from "./builder-v2-ui-ir-motion";
 export * from "./builder-v2-ui-ir-interaction";
 export * from "./builder-v2-ui-ir-vector";
@@ -108,6 +113,21 @@ export const BuilderV2UiIrTextSchema = z.discriminatedUnion("kind", [
       fallback: z.string().max(32_000),
     })
     .strict(),
+  /**
+   * A value from the loaded offering: the price, the period, the trial.
+   *
+   * Deliberately carries no fallback. A price the device has not loaded is a
+   * price nobody knows, and the one thing a paywall must never do is show a
+   * number that is not the one being charged — so it renders as nothing, and
+   * the block around it is gated on the plan existing.
+   */
+  z
+    .object({
+      kind: z.literal("billing"),
+      plan: BuilderV2UiIrPlanRefSchema,
+      field: BuilderV2UiIrPlanFieldSchema,
+    })
+    .strict(),
 ]);
 
 export const BuilderV2UiIrActionSchema = z.discriminatedUnion("type", [
@@ -127,13 +147,39 @@ export const BuilderV2UiIrActionSchema = z.discriminatedUnion("type", [
       placement: z.string().trim().min(1).max(120),
     })
     .strict(),
+  /**
+   * Buy something the person chose.
+   *
+   * The source is a nested union rather than three optional fields so that
+   * "exactly one way of naming the purchase" is the schema's job and not a
+   * refinement every reader has to remember. `packageId` is a fixed product,
+   * `plan` a position in the offering, and `planFromState` the plan the screen
+   * has selected — the only one of the three a real multi-plan paywall uses.
+   */
   z
     .object({
       type: z.literal("billing.purchase"),
-      packageId: z.string().trim().min(1).max(160),
+      source: z.union([
+        z.object({ packageId: z.string().trim().min(1).max(160) }).strict(),
+        z.object({ plan: BuilderV2UiIrPlanRefSchema }).strict(),
+        z.object({ planFromState: z.string().trim().min(1).max(80) }).strict(),
+      ]),
     })
     .strict(),
   z.object({ type: z.literal("billing.restore") }).strict(),
+  /**
+   * Open a URL outside the flow — the terms of service and the privacy policy
+   * every paywall is required to link, which the dialect could not express at
+   * all. The URL is resolved from the project manifest at publish time, so the
+   * artifact still carries a static string and the address stays editable
+   * without touching a screen.
+   */
+  z
+    .object({
+      type: z.literal("link.open"),
+      url: z.string().trim().url().max(2_048),
+    })
+    .strict(),
   z.object({ type: z.literal("paywall.dismiss") }).strict(),
   z
     .object({
@@ -159,13 +205,13 @@ type NodeBase = {
   style?: Record<string, BuilderV2UiIrJsonValue>;
   /** Merged over `style`, in order, while their condition holds. */
   variants?: Array<{
-    when: BuilderV2UiIrStateCondition;
+    when: BuilderV2UiIrCondition;
     style: Record<string, BuilderV2UiIrJsonValue>;
   }>;
   /** The node renders only while this holds. Absent means always. */
-  presence?: BuilderV2UiIrStateCondition;
+  presence?: BuilderV2UiIrCondition;
   /** Reported as accessibilityState.selected while this holds. */
-  accessibilitySelected?: BuilderV2UiIrStateCondition;
+  accessibilitySelected?: BuilderV2UiIrCondition;
   source?: z.infer<typeof BuilderV2UiIrSourceRefSchema>;
   /**
    * What a screen reader announces for this node.
@@ -205,7 +251,7 @@ export type BuilderV2UiIrNode =
   | (NodeBase & {
       type: "pressable";
       action: z.infer<typeof BuilderV2UiIrActionSchema>;
-      disabled?: boolean | BuilderV2UiIrStateCondition;
+      disabled?: boolean | BuilderV2UiIrCondition;
       contentStyle?: Record<string, BuilderV2UiIrJsonValue>;
       /**
        * Merged over `style` while the press is held.
@@ -264,6 +310,23 @@ export type BuilderV2UiIrNode =
       capability: string;
       component: string;
       props: BuilderV2UiIrJsonValue;
+    })
+  /**
+   * Repeats its children once per plan in the loaded offering.
+   *
+   * The only node whose child count is not known at publish time, and the
+   * reason it is allowed: the collection is the offering, which the runtime
+   * loads and the artifact merely names. Everything inside still describes —
+   * a `{ current: true }` plan reference resolves to the plan being repeated,
+   * exactly as a fixed slot resolves to a position.
+   *
+   * `limit` bounds it, so a document's worst-case size is still a number a
+   * reviewer can read off the artifact.
+   */
+  | (NodeBase & {
+      type: "billing-plans";
+      limit: number;
+      children: BuilderV2UiIrNode[];
     });
 
 const CommonNodeSchema = z.object({
@@ -273,15 +336,15 @@ const CommonNodeSchema = z.object({
     .array(
       z
         .object({
-          when: BuilderV2UiIrStateConditionSchema,
+          when: BuilderV2UiIrConditionSchema,
           style: BuilderV2UiIrStyleSchema,
         })
         .strict(),
     )
     .max(8)
     .optional(),
-  presence: BuilderV2UiIrStateConditionSchema.optional(),
-  accessibilitySelected: BuilderV2UiIrStateConditionSchema.optional(),
+  presence: BuilderV2UiIrConditionSchema.optional(),
+  accessibilitySelected: BuilderV2UiIrConditionSchema.optional(),
   source: BuilderV2UiIrSourceRefSchema.optional(),
   accessibilityLabel: BuilderV2UiIrTextSchema.optional(),
 });
@@ -333,7 +396,7 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
         type: z.literal("pressable"),
         action: BuilderV2UiIrActionSchema,
         disabled: z
-          .union([z.boolean(), BuilderV2UiIrStateConditionSchema])
+          .union([z.boolean(), BuilderV2UiIrConditionSchema])
           .optional(),
         contentStyle: BuilderV2UiIrStyleSchema.optional(),
         pressedStyle: BuilderV2UiIrStyleSchema.optional(),
@@ -384,6 +447,11 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
         capability: z.string().trim().min(1).max(120),
         component: z.string().trim().min(1).max(120),
         props: BuilderV2UiIrJsonValueSchema,
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("billing-plans"),
+        limit: z.number().int().min(1).max(8),
+        children: z.array(BuilderV2UiIrNodeSchema).max(1_000),
       }).strict(),
     ]),
 );

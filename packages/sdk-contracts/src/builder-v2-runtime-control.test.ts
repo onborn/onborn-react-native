@@ -5,5 +5,8 @@ import { BuilderV2MobileRuntimeTargetSchema } from "./builder-v2-runtime-control
 test("mobile runtime control accepts native targets and rejects web", () => {
   assert.equal(BuilderV2MobileRuntimeTargetSchema.parse("ios"), "ios");
   assert.equal(BuilderV2MobileRuntimeTargetSchema.parse("android"), "android");
-  assert.equal(BuilderV2MobileRuntimeTargetSchema.safeParse("web").success, false);
+  assert.equal(
+    BuilderV2MobileRuntimeTargetSchema.safeParse("web").success,
+    false,
+  );
 });

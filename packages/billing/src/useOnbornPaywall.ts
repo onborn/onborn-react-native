@@ -88,7 +88,11 @@ export function useOnbornPaywall(
 
   const packages = useMemo(
     () =>
-      getPackagesWithProducts(data?.offering, data?.products, runtimeOptions.platform),
+      getPackagesWithProducts(
+        data?.offering,
+        data?.products,
+        runtimeOptions.platform,
+      ),
     [data?.offering, data?.products, runtimeOptions.platform],
   );
 
@@ -103,12 +107,15 @@ export function useOnbornPaywall(
     setError(null);
     try {
       const response = await client.loadPaywall(runtimeOptions.paywallId);
-      const products = await loadLocalizedProducts(runtimeOptions.billingAdapter, {
-        paywall: response.paywall,
-        offering: response.offering,
-        products: response.products,
-        userId: runtimeOptions.userId,
-      });
+      const products = await loadLocalizedProducts(
+        runtimeOptions.billingAdapter,
+        {
+          paywall: response.paywall,
+          offering: response.offering,
+          products: response.products,
+          userId: runtimeOptions.userId,
+        },
+      );
       setData({ ...response, products });
       setSelectedPackageId((current) => {
         if (
@@ -124,7 +131,12 @@ export function useOnbornPaywall(
     } finally {
       setLoading(false);
     }
-  }, [client, runtimeOptions.billingAdapter, runtimeOptions.paywallId, runtimeOptions.userId]);
+  }, [
+    client,
+    runtimeOptions.billingAdapter,
+    runtimeOptions.paywallId,
+    runtimeOptions.userId,
+  ]);
 
   useEffect(() => {
     void load();
@@ -213,13 +225,14 @@ export function useOnbornPaywall(
           .catch(() => {});
       }
       try {
-        const adapterResult = await runtimeOptions.billingAdapter.purchasePackage({
-          paywall: data.paywall,
-          offering: data.offering,
-          package: item.package,
-          product: item.product,
-          userId: runtimeOptions.userId,
-        });
+        const adapterResult =
+          await runtimeOptions.billingAdapter.purchasePackage({
+            paywall: data.paywall,
+            offering: data.offering,
+            package: item.package,
+            product: item.product,
+            userId: runtimeOptions.userId,
+          });
         const result = adapterResult.success
           ? await validateBillingPurchase({
               client,
@@ -313,12 +326,13 @@ export function useOnbornPaywall(
           .catch(() => {});
       }
       try {
-        const adapterResult = await runtimeOptions.billingAdapter.restorePurchases({
-          paywall: data?.paywall,
-          offering: data?.offering,
-          products: data?.products ?? [],
-          userId: runtimeOptions.userId,
-        });
+        const adapterResult =
+          await runtimeOptions.billingAdapter.restorePurchases({
+            paywall: data?.paywall,
+            offering: data?.offering,
+            products: data?.products ?? [],
+            userId: runtimeOptions.userId,
+          });
         const result = await validateBillingRestore({
           client,
           offering: data?.offering,

@@ -43,6 +43,4 @@ export const BuilderV2ProjectAssetSchema = z
   })
   .strict();
 
-export type BuilderV2ProjectAsset = z.infer<
-  typeof BuilderV2ProjectAssetSchema
->;
+export type BuilderV2ProjectAsset = z.infer<typeof BuilderV2ProjectAssetSchema>;

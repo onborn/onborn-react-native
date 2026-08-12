@@ -11,6 +11,10 @@ const BUILT_IN_CAPABILITIES: BuilderV2UiIrHostManifest["capabilities"] = [
   // at session start; a host manifest is a promise, not a wish.
   { name: "google-fonts", version: 1 },
   { name: "image", version: 1 },
+  // Terms and privacy links: the runtime opens them through React Native's
+  // Linking, so a paywall that carries the links App Review requires is
+  // renderable rather than judged incompatible.
+  { name: "linking", version: 1 },
   { name: "localization", version: 1 },
   { name: "navigation", version: 1 },
   // The renderer has always drawn phosphor-icon nodes and this package has

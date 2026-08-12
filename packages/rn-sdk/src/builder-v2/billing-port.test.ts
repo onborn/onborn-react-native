@@ -18,10 +18,9 @@ test("maps only backend-validated purchases to completed", () => {
     }),
     { status: "completed", productId: "premium_yearly" },
   );
-  assert.deepEqual(
-    mapPurchaseResult({ success: false, status: "pending" }),
-    { status: "pending" },
-  );
+  assert.deepEqual(mapPurchaseResult({ success: false, status: "pending" }), {
+    status: "pending",
+  });
   assert.throws(
     () => mapPurchaseResult({ success: false, status: "rejected" }),
     /could not validate/,
@@ -40,10 +39,9 @@ test("returns only active restored entitlement keys", () => {
     }),
     { status: "completed", entitlementKeys: ["premium"] },
   );
-  assert.deepEqual(
-    mapRestoreResult({ success: true, status: "validated" }),
-    { status: "empty" },
-  );
+  assert.deepEqual(mapRestoreResult({ success: true, status: "validated" }), {
+    status: "empty",
+  });
   assert.throws(
     () => mapRestoreResult({ success: false, status: "rejected" }),
     /could not validate/,
@@ -57,10 +55,9 @@ test("normalizes explicit cancellation without hiding other errors", async () =>
     },
     restorePurchases: async () => ({ success: true, status: "validated" }),
   }));
-  assert.deepEqual(
-    await cancelled.purchase({ packageId: "premium" }),
-    { status: "cancelled" },
-  );
+  assert.deepEqual(await cancelled.purchase({ packageId: "premium" }), {
+    status: "cancelled",
+  });
 
   const failed = createBuilderV2BillingPort(() => ({
     purchasePackage: async () => {

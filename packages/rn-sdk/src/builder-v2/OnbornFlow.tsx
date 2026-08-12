@@ -2,6 +2,7 @@ import {
   useCallback,
   useMemo,
   useRef,
+  useState,
   type MutableRefObject,
   type ReactNode,
 } from "react";
@@ -34,6 +35,8 @@ import type { CustomerEntitlement } from "@onborn/sdk-contracts";
 
 import { resolveOnbornRuntimeConfig } from "../config/Onborn";
 import { createBuilderV2BillingPort } from "./billing-port";
+import { createBuilderV2PlanSnapshot } from "./plan-snapshot";
+import { readUiIrOfferingKey } from "@onborn/runtime-ui-ir";
 import {
   ONBORN_BUILDER_V2_API_BASE_URL,
   resolveBuilderV2Environment,
@@ -60,7 +63,16 @@ export function OnbornFlow(props: OnbornFlowProps): ReactNode {
   const environment = resolveBuilderV2Environment(config.apiKey);
   const callbacks = useLatestCallbacks(props);
   const nativeStore = useExpoIapBillingAdapter();
+  /*
+   * Which offering to load is in the artifact, which is not in hand on the
+   * first render — so the flow starts on the environment's current offering
+   * and switches once the document names another. The extra load only happens
+   * for a flow that chose one, and prices stay blank until it settles rather
+   * than briefly showing the wrong offering's.
+   */
+  const [offeringKey, setOfferingKey] = useState<string | undefined>(undefined);
   const offering = useOnbornOffering({
+    ...(offeringKey ? { offeringKey } : {}),
     billingAdapter: nativeStore.billingAdapter,
     onEntitlementsChanged: (entitlements) => {
       callbacks.current.onEntitlementsChanged?.(entitlements);
@@ -68,6 +80,18 @@ export function OnbornFlow(props: OnbornFlowProps): ReactNode {
   });
   const offeringRef = useRef<UseOnbornOfferingState>(offering);
   offeringRef.current = offering;
+
+  // The offering the dashboard configured, in the shape a paywall's price
+  // bindings read. Recomputed as the store localizes, so a price appears the
+  // moment it is known rather than at the next mount.
+  const plans = useMemo(
+    () =>
+      createBuilderV2PlanSnapshot({
+        loading: offering.loading,
+        packages: offering.packages,
+      }),
+    [offering.loading, offering.packages],
+  );
 
   const input = useMemo(
     () => ({
@@ -96,6 +120,10 @@ export function OnbornFlow(props: OnbornFlowProps): ReactNode {
       input={input}
       dependencies={dependencies}
       locale={props.locale ?? config.locale}
+      plans={plans}
+      onSessionReady={(session) => {
+        setOfferingKey(readUiIrOfferingKey(session.document));
+      }}
       renderLoading={props.renderLoading}
       renderError={props.renderError}
     />

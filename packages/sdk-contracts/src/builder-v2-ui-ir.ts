@@ -7,6 +7,7 @@ import {
   BuilderV2UiIrNodeSchema,
   type BuilderV2UiIrNode,
 } from "./builder-v2-ui-ir-primitives";
+import { BuilderV2UiIrBillingBindingSchema } from "./builder-v2-ui-ir-billing";
 import { BuilderV2UiIrScreenStateSchema } from "./builder-v2-ui-ir-interaction";
 
 export const BUILDER_V2_UI_IR_FORMAT = "onborn-ui-ir-v1" as const;
@@ -32,11 +33,14 @@ export const BuilderV2UiIrScreenSchema = z
      * state space is readable from the document.
      */
     state: z
-      .record(
-        z.string().trim().min(1).max(80),
-        BuilderV2UiIrScreenStateSchema,
-      )
+      .record(z.string().trim().min(1).max(80), BuilderV2UiIrScreenStateSchema)
       .optional(),
+    /**
+     * Which offering this screen's plan bindings read. The runtime needs it
+     * before it can resolve a single price, so it travels in the document
+     * rather than staying behind in the project manifest.
+     */
+    billing: BuilderV2UiIrBillingBindingSchema.optional(),
     root: BuilderV2UiIrNodeSchema,
   })
   .strict()
@@ -46,6 +50,13 @@ export const BuilderV2UiIrScreenSchema = z
         code: z.ZodIssueCode.custom,
         message: "Only paywall screens can declare a placement",
         path: ["placement"],
+      });
+    }
+    if (screen.billing && screen.surface !== "paywall") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Only paywall screens can bind an offering",
+        path: ["billing"],
       });
     }
     addDuplicateNodeIssues(screen.root, context);
@@ -86,6 +97,29 @@ export const BuilderV2UiIrDocumentSchema = z
   .superRefine((document, context) => {
     const screenIds = new Set<string>();
     const placements = new Set<string>();
+    /*
+     * One offering per flow.
+     *
+     * The host loads an offering once, before any screen renders, so two
+     * paywalls naming different offerings could not both be right — one of them
+     * would silently sell the other's plans at the other's prices. Refusing at
+     * publish time is the only place this can be caught before someone is
+     * charged for the wrong thing.
+     */
+    const offeringKeys = new Set(
+      document.screens
+        .map((screen) => screen.billing?.offeringKey)
+        .filter((key): key is string => Boolean(key)),
+    );
+    if (offeringKeys.size > 1) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `A flow sells one offering; this one names ${[...offeringKeys]
+          .map((key) => `"${key}"`)
+          .join(" and ")}.`,
+        path: ["screens"],
+      });
+    }
     document.screens.forEach((screen, index) => {
       if (screenIds.has(screen.screenId)) {
         context.addIssue({

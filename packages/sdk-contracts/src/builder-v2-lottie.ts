@@ -1,8 +1,7 @@
 import { z } from "zod";
 
 export const BUILDER_V2_LOTTIE_CAPABILITY_VERSION = 1 as const;
-export const BUILDER_V2_LOTTIE_PACKAGE_NAME =
-  "lottie-react-native" as const;
+export const BUILDER_V2_LOTTIE_PACKAGE_NAME = "lottie-react-native" as const;
 export const BUILDER_V2_LOTTIE_PACKAGE_VERSION = "7.3.8" as const;
 export const BUILDER_V2_LOTTIE_RUNTIME_PACKAGE_NAME =
   "@onborn/runtime-capability-lottie" as const;
@@ -51,18 +50,8 @@ export const BuilderV2ProjectLottieSchema = z
   })
   .strict()
   .superRefine((lottie, context) => {
-    addDuplicateIssues(
-      lottie.assets,
-      "assetId",
-      "Lottie asset id",
-      context,
-    );
-    addDuplicateIssues(
-      lottie.assets,
-      "file",
-      "Lottie asset file",
-      context,
-    );
+    addDuplicateIssues(lottie.assets, "assetId", "Lottie asset id", context);
+    addDuplicateIssues(lottie.assets, "file", "Lottie asset file", context);
   });
 
 export const BuilderV2ArtifactLottieAssetSchema =

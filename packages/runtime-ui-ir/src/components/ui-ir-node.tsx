@@ -29,7 +29,13 @@ import { UiIrAnimatedView } from "./ui-ir-animated-view";
 import { UiIrPhosphorIcon } from "./ui-ir-phosphor-icon";
 import { UiIrPressable } from "./ui-ir-pressable";
 import { UiIrVectorNode } from "./ui-ir-vector-node";
-import { uiIrConditionHolds } from "../domain/ui-ir-state";
+import { uiIrGateHolds } from "../domain/ui-ir-state";
+import {
+  resolveUiIrPlanField,
+  uiIrPlanCount,
+  type UiIrPlanSnapshot,
+} from "../domain/ui-ir-plans";
+import { UiIrCurrentPlanProvider, useUiIrPlans } from "./ui-ir-plans-context";
 import { useUiIrScreenState } from "./ui-ir-screen-state";
 
 type UiIrNodeProps = {
@@ -43,20 +49,23 @@ type UiIrNodeProps = {
 
 export function UiIrNode(props: UiIrNodeProps): ReactElement | null {
   const screenState = useUiIrScreenState();
+  const plans = useUiIrPlans();
+  const gate = {
+    values: screenState.values,
+    plans: plans.snapshot,
+    currentPlanIndex: plans.currentIndex,
+  };
   /*
    * Runtime-dependent appearance, all three slots the dialect has: a node may
    * not render at all, may merge variant styles while a selection holds, and
    * may report itself selected to a screen reader. Evaluated here, before the
    * per-type rendering, so every node type gets them for free.
    */
-  if (
-    props.node.presence &&
-    !uiIrConditionHolds(screenState.values, props.node.presence)
-  ) {
+  if (props.node.presence && !uiIrGateHolds(props.node.presence, gate)) {
     return null;
   }
   const activeVariantStyle = (props.node.variants ?? [])
-    .filter((variant) => uiIrConditionHolds(screenState.values, variant.when))
+    .filter((variant) => uiIrGateHolds(variant.when, gate))
     .reduce<BuilderV2UiIrStyle>(
       (merged, variant) => ({ ...merged, ...variant.style }),
       {},
@@ -68,14 +77,16 @@ export function UiIrNode(props: UiIrNodeProps): ReactElement | null {
   const accessibilityState = props.node.accessibilitySelected
     ? {
         accessibilityState: {
-          selected: uiIrConditionHolds(
-            screenState.values,
-            props.node.accessibilitySelected,
-          ),
+          selected: uiIrGateHolds(props.node.accessibilitySelected, gate),
         },
       }
     : {};
-  const element = renderNodeElement(props, nodeStyle, accessibilityState);
+  const element = renderNodeElement(
+    props,
+    nodeStyle,
+    accessibilityState,
+    plans,
+  );
   return decorateRenderedUiIrNode(props.ports, {
     screenId: props.screenId,
     node: props.node,
@@ -89,6 +100,7 @@ function renderNodeElement(
   accessibilityState: {
     accessibilityState?: { selected: boolean };
   },
+  plans: { snapshot: UiIrPlanSnapshot; currentIndex: number | null },
 ): ReactElement {
   const common = {
     ...createUiIrNodeCommonProps(props.node, props.document, props.locale),
@@ -138,7 +150,7 @@ function renderNodeElement(
     case "text":
       return (
         <Text {...common} style={asTextStyle(nodeStyle)}>
-          {resolveUiIrText(props.document, props.node.text, props.locale)}
+          {resolveUiIrNodeText(props, props.node.text, plans)}
         </Text>
       );
     case "image":
@@ -210,7 +222,55 @@ function renderNodeElement(
           })}
         </>
       );
+    /*
+     * The subtree is described once and instantiated per plan. Each instance
+     * names which plan it is, so a `{ current: true }` binding inside it reads
+     * that plan's price rather than the first one's.
+     */
+    case "billing-plans":
+      return <UiIrPlanRepeat {...props} node={props.node} />;
   }
+}
+
+/**
+ * Text is literal, localized, or read from the offering.
+ *
+ * The billing case is resolved here rather than in `resolveUiIrText` because it
+ * needs the loaded plans, which are context and not part of the document.
+ */
+function resolveUiIrNodeText(
+  props: UiIrNodeProps,
+  text: Extract<BuilderV2UiIrNode, { type: "text" }>["text"],
+  plans: { snapshot: UiIrPlanSnapshot; currentIndex: number | null },
+): string {
+  return text.kind === "billing"
+    ? resolveUiIrPlanField(
+        plans.snapshot,
+        text.plan,
+        text.field,
+        plans.currentIndex,
+      )
+    : resolveUiIrText(props.document, text, props.locale);
+}
+
+function UiIrPlanRepeat(
+  props: UiIrNodeProps & {
+    node: Extract<BuilderV2UiIrNode, { type: "billing-plans" }>;
+  },
+): ReactElement {
+  const { snapshot } = useUiIrPlans();
+  const count = uiIrPlanCount(snapshot, props.node.limit);
+  return (
+    <>
+      {Array.from({ length: count }, (_unused, index) => (
+        <UiIrCurrentPlanProvider index={index} key={index}>
+          {props.node.children.map((child) => (
+            <UiIrNode {...props} key={child.id} node={child} />
+          ))}
+        </UiIrCurrentPlanProvider>
+      ))}
+    </>
+  );
 }
 
 function renderChildren(props: UiIrNodeProps): ReactElement[] {

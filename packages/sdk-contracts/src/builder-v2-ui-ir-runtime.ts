@@ -83,7 +83,10 @@ export function evaluateBuilderV2UiIrCompatibility(
   }
 
   const hostCapabilities = new Map(
-    host.capabilities.map((capability) => [capability.name, capability.version]),
+    host.capabilities.map((capability) => [
+      capability.name,
+      capability.version,
+    ]),
   );
   for (const requirement of artifact.requiredCapabilities) {
     const actualVersion = hostCapabilities.get(requirement.name);

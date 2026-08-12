@@ -49,15 +49,52 @@ const LocaleCodeSchema = z
 
 export const BuilderV2ProjectSurfaceSchema = z.enum(["onboarding", "paywall"]);
 
+/**
+ * The addresses a paywall is required to link.
+ *
+ * Project-level because they are the app's own legal documents: the same two
+ * URLs on every paywall, and nothing a screen should own a copy of. Keeping
+ * them here is what lets the builder edit them without touching a screen, and
+ * what lets the compiler refuse a terms link that points nowhere.
+ */
+export const BuilderV2ProjectLegalSchema = z
+  .object({
+    termsUrl: z.string().trim().url().max(2_048).optional(),
+    privacyUrl: z.string().trim().url().max(2_048).optional(),
+  })
+  .strict();
+
+/**
+ * Which offering a paywall screen spends.
+ *
+ * Per screen rather than per project: a flow may well show a discounted
+ * offering at one placement and the standard one at another. Omitted means the
+ * environment's current offering, which is what every existing flow gets, so
+ * adding this changes nothing until someone chooses.
+ */
+export const BuilderV2ProjectScreenPaywallSchema = z
+  .object({
+    offeringKey: z.string().trim().min(1).max(160).optional(),
+  })
+  .strict();
+
 export const BuilderV2ProjectScreenSchema = z
   .object({
     screenId: ProjectIdSchema,
     file: SourcePathSchema,
     surface: BuilderV2ProjectSurfaceSchema,
     placement: BuilderV2PaywallPlacementSchema.optional(),
+    paywall: BuilderV2ProjectScreenPaywallSchema.optional(),
   })
   .strict()
   .superRefine((screen, context) => {
+    if (screen.paywall && screen.surface !== "paywall") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Only paywall screens can carry paywall settings",
+        path: ["paywall"],
+      });
+    }
     if (screen.placement && screen.surface !== "paywall") {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -140,6 +177,7 @@ export const BuilderV2ProjectManifestSchema = z
     phosphorIcons: BuilderV2ProjectPhosphorIconsSchema.optional(),
     assets: z.array(BuilderV2ProjectAssetSchema).max(1_000).optional(),
     screens: z.array(BuilderV2ProjectScreenSchema).min(1).max(1_000),
+    legal: BuilderV2ProjectLegalSchema.optional(),
     localization: BuilderV2ProjectLocalizationSchema.optional(),
     capabilities: z
       .array(BuilderV2NativeCapabilityRegistrationSchema)
@@ -235,6 +273,12 @@ export type BuilderV2ProjectLocale = z.infer<
 export type BuilderV2ProjectLocalization = z.infer<
   typeof BuilderV2ProjectLocalizationSchema
 >;
+export type BuilderV2ProjectLegal = z.infer<typeof BuilderV2ProjectLegalSchema>;
+
+export type BuilderV2ProjectScreenPaywall = z.infer<
+  typeof BuilderV2ProjectScreenPaywallSchema
+>;
+
 export type BuilderV2ProjectManifest = z.infer<
   typeof BuilderV2ProjectManifestSchema
 >;

@@ -26,10 +26,10 @@ test("accepts a universal UI IR artifact without shared module declarations", ()
     ],
   });
 
-  assert.deepEqual(
-    evaluateBuilderV2UiIrCompatibility(artifact, "ios", host),
-    { compatible: true, issues: [] },
-  );
+  assert.deepEqual(evaluateBuilderV2UiIrCompatibility(artifact, "ios", host), {
+    compatible: true,
+    issues: [],
+  });
 });
 
 test("reports target, runtime, and capability incompatibilities", () => {
@@ -40,31 +40,28 @@ test("reports target, runtime, and capability incompatibilities", () => {
     capabilities: [{ name: "billing", version: 1 }],
   });
 
-  assert.deepEqual(
-    evaluateBuilderV2UiIrCompatibility(artifact, "ios", host),
-    {
-      compatible: false,
-      issues: [
-        { code: "target_mismatch", required: "ios", actual: "android" },
-        {
-          code: "runtime_version_mismatch",
-          required: "onborn-runtime-1",
-          actual: "onborn-runtime-2",
-        },
-        {
-          code: "capability_missing",
-          name: "analytics",
-          minimumVersion: 1,
-        },
-        {
-          code: "capability_version_too_low",
-          name: "billing",
-          minimumVersion: 2,
-          actualVersion: 1,
-        },
-      ],
-    },
-  );
+  assert.deepEqual(evaluateBuilderV2UiIrCompatibility(artifact, "ios", host), {
+    compatible: false,
+    issues: [
+      { code: "target_mismatch", required: "ios", actual: "android" },
+      {
+        code: "runtime_version_mismatch",
+        required: "onborn-runtime-1",
+        actual: "onborn-runtime-2",
+      },
+      {
+        code: "capability_missing",
+        name: "analytics",
+        minimumVersion: 1,
+      },
+      {
+        code: "capability_version_too_low",
+        name: "billing",
+        minimumVersion: 2,
+        actualVersion: 1,
+      },
+    ],
+  });
 });
 
 test("rejects duplicate host capabilities", () => {

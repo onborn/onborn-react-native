@@ -14,15 +14,11 @@ export const FlowTranslationsSchema = z
   .object({
     defaultLocale: z.string().trim().min(2).max(16).default("en"),
     locales: z.array(FlowTranslationLocaleSchema).max(32).default([]),
-    values: z
-      .record(z.string(), z.record(z.string(), z.string()))
-      .default({}),
+    values: z.record(z.string(), z.record(z.string(), z.string())).default({}),
   })
   .strict();
 
-export type FlowTranslationLocale = z.infer<
-  typeof FlowTranslationLocaleSchema
->;
+export type FlowTranslationLocale = z.infer<typeof FlowTranslationLocaleSchema>;
 export type FlowTranslations = z.infer<typeof FlowTranslationsSchema>;
 
 export type FlowTranslationSource = {
@@ -59,7 +55,11 @@ function ensureFlowTranslations(
   return {
     defaultLocale: flow.translations?.defaultLocale ?? "en",
     locales: flow.translations?.locales ?? [
-      translationLocaleForCode("en") ?? { code: "en", label: "English", flag: "🇺🇸" },
+      translationLocaleForCode("en") ?? {
+        code: "en",
+        label: "English",
+        flag: "🇺🇸",
+      },
     ],
     values: flow.translations?.values ?? {},
   };
@@ -71,7 +71,11 @@ function ensurePaywallTranslations(
   return {
     defaultLocale: paywall.translations?.defaultLocale ?? "en",
     locales: paywall.translations?.locales ?? [
-      translationLocaleForCode("en") ?? { code: "en", label: "English", flag: "🇺🇸" },
+      translationLocaleForCode("en") ?? {
+        code: "en",
+        label: "English",
+        flag: "🇺🇸",
+      },
     ],
     values: paywall.translations?.values ?? {},
   };
@@ -82,7 +86,9 @@ export function addFlowTranslationLocale(
   locale: FlowTranslationLocale,
 ): FlowConfig {
   const translations = ensureFlowTranslations(flow);
-  const nextLocales = translations.locales.some((item) => item.code === locale.code)
+  const nextLocales = translations.locales.some(
+    (item) => item.code === locale.code,
+  )
     ? translations.locales
     : [...translations.locales, locale];
   return {
@@ -114,11 +120,16 @@ export function removeFlowTranslationLocale(
     ...flow,
     translations: {
       ...translations,
-      locales: translations.locales.filter((locale) => locale.code !== localeCode),
+      locales: translations.locales.filter(
+        (locale) => locale.code !== localeCode,
+      ),
       values,
     },
   };
-  const withDefaults = ensureFlowTranslationDefaults(withoutLocale, referenceFlow);
+  const withDefaults = ensureFlowTranslationDefaults(
+    withoutLocale,
+    referenceFlow,
+  );
   return applyFlowTranslations(withDefaults, defaultLocaleCode);
 }
 
@@ -178,9 +189,27 @@ const TEXT_FIELDS_BY_TYPE: Record<string, string[]> = {
   age_picker: ["selectorLabel", "valueSuffix", "sheetTitle", "actionText"],
   height_picker: ["selectorLabel", "sheetTitle", "actionText"],
   weight_picker: ["selectorLabel", "sheetTitle", "actionText"],
-  package_selector: ["title", "subtitle", "badge", "priceTemplate", "priceFallback"],
-  package_card: ["title", "subtitle", "badge", "priceTemplate", "priceFallback"],
-  package_list: ["title", "subtitle", "badge", "priceTemplate", "priceFallback"],
+  package_selector: [
+    "title",
+    "subtitle",
+    "badge",
+    "priceTemplate",
+    "priceFallback",
+  ],
+  package_card: [
+    "title",
+    "subtitle",
+    "badge",
+    "priceTemplate",
+    "priceFallback",
+  ],
+  package_list: [
+    "title",
+    "subtitle",
+    "badge",
+    "priceTemplate",
+    "priceFallback",
+  ],
   price_text: ["template", "fallbackText"],
   trial_text: ["template", "fallbackText"],
   restore_purchases_button: ["text"],
@@ -307,15 +336,17 @@ export function collectPaywallTranslationSources(
 function orderedPrimitiveEntries(
   primitives: Record<string, unknown>,
 ): Array<[string, unknown]> {
-  return Object.entries(primitives).sort(([keyA, primitiveA], [keyB, primitiveB]) => {
-    const sortA = primitiveSortTuple(keyA, primitiveA);
-    const sortB = primitiveSortTuple(keyB, primitiveB);
-    return (
-      sortA.slot - sortB.slot ||
-      sortA.order - sortB.order ||
-      sortA.key.localeCompare(sortB.key)
-    );
-  });
+  return Object.entries(primitives).sort(
+    ([keyA, primitiveA], [keyB, primitiveB]) => {
+      const sortA = primitiveSortTuple(keyA, primitiveA);
+      const sortB = primitiveSortTuple(keyB, primitiveB);
+      return (
+        sortA.slot - sortB.slot ||
+        sortA.order - sortB.order ||
+        sortA.key.localeCompare(sortB.key)
+      );
+    },
+  );
 }
 
 function primitiveSortTuple(
@@ -350,7 +381,9 @@ export function buildDefaultTranslationSnapshot(
   flow: FlowConfig,
 ): Record<string, string> {
   const sources = collectFlowTranslationSources(flow);
-  return Object.fromEntries(sources.map((source) => [source.key, source.value]));
+  return Object.fromEntries(
+    sources.map((source) => [source.key, source.value]),
+  );
 }
 
 export function ensureFlowTranslationDefaults(
@@ -419,10 +452,7 @@ export function applyFlowTranslations(
 ): FlowConfig {
   const normalizedLocale = locale?.trim();
   const translations = flow.translations;
-  if (
-    !normalizedLocale ||
-    !translations
-  ) {
+  if (!normalizedLocale || !translations) {
     return flow;
   }
 
@@ -457,7 +487,11 @@ export function applyFlowTranslations(
     if (typeof value !== "string" || value.length === 0) {
       continue;
     }
-    setPathValue(next as unknown as Record<string, unknown>, key.split("."), value);
+    setPathValue(
+      next as unknown as Record<string, unknown>,
+      key.split("."),
+      value,
+    );
   }
   return next;
 }
@@ -469,10 +503,13 @@ export function setPaywallTranslationValue(
   value: string,
 ): PaywallConfig {
   const translations = ensurePaywallTranslations(paywall);
-  const locale =
-    translations.locales.find((item) => item.code === localeCode) ??
-    translationLocaleForCode(localeCode) ??
-    { code: localeCode, label: localeCode.toUpperCase() };
+  const locale = translations.locales.find(
+    (item) => item.code === localeCode,
+  ) ??
+    translationLocaleForCode(localeCode) ?? {
+      code: localeCode,
+      label: localeCode.toUpperCase(),
+    };
   const locales = translations.locales.some((item) => item.code === locale.code)
     ? translations.locales
     : [...translations.locales, locale];
@@ -498,10 +535,13 @@ export function setPaywallTranslationValues(
   values: Record<string, string>,
 ): PaywallConfig {
   const translations = ensurePaywallTranslations(paywall);
-  const locale =
-    translations.locales.find((item) => item.code === localeCode) ??
-    translationLocaleForCode(localeCode) ??
-    { code: localeCode, label: localeCode.toUpperCase() };
+  const locale = translations.locales.find(
+    (item) => item.code === localeCode,
+  ) ??
+    translationLocaleForCode(localeCode) ?? {
+      code: localeCode,
+      label: localeCode.toUpperCase(),
+    };
   const locales = translations.locales.some((item) => item.code === locale.code)
     ? translations.locales
     : [...translations.locales, locale];
@@ -572,7 +612,10 @@ export function prepareBuilderPaywallDraft(
   paywall: PaywallConfig,
   referencePaywall?: PaywallConfig | null,
 ): PaywallConfig {
-  const withDefaults = ensurePaywallTranslationDefaults(paywall, referencePaywall);
+  const withDefaults = ensurePaywallTranslationDefaults(
+    paywall,
+    referencePaywall,
+  );
   const defaultLocale = withDefaults.translations?.defaultLocale ?? "en";
   const defaultValues = withDefaults.translations?.values[defaultLocale];
   if (!defaultValues || Object.keys(defaultValues).length === 0) {
@@ -622,7 +665,11 @@ export function applyPaywallTranslations(
     if (typeof value !== "string" || value.length === 0) {
       continue;
     }
-    setPathValue(next as unknown as Record<string, unknown>, key.split("."), value);
+    setPathValue(
+      next as unknown as Record<string, unknown>,
+      key.split("."),
+      value,
+    );
   }
   return next;
 }
@@ -638,7 +685,9 @@ function collectPrimitiveTranslationSources(
   const record = primitive as Record<string, unknown>;
   const type = typeof record.type === "string" ? record.type : "";
   const props =
-    record.props && typeof record.props === "object" && !Array.isArray(record.props)
+    record.props &&
+    typeof record.props === "object" &&
+    !Array.isArray(record.props)
       ? (record.props as Record<string, unknown>)
       : {};
 
@@ -706,7 +755,10 @@ function collectPrimitiveTranslationSources(
     });
   }
 
-  if ((type === "x_stack" || type === "y_stack") && Array.isArray(props.children)) {
+  if (
+    (type === "x_stack" || type === "y_stack") &&
+    Array.isArray(props.children)
+  ) {
     props.children.forEach((child, index) => {
       collectPrimitiveTranslationSources(
         sources,
@@ -757,7 +809,11 @@ function setPathValue(
     }
     if (Array.isArray(cursor)) {
       const itemIndex = Number(segment);
-      if (Number.isInteger(itemIndex) && itemIndex >= 0 && itemIndex < cursor.length) {
+      if (
+        Number.isInteger(itemIndex) &&
+        itemIndex >= 0 &&
+        itemIndex < cursor.length
+      ) {
         cursor = cursor[itemIndex];
         continue;
       }
@@ -785,7 +841,11 @@ function setPathValue(
   }
   if (Array.isArray(cursor)) {
     const itemIndex = Number(last);
-    if (Number.isInteger(itemIndex) && itemIndex >= 0 && itemIndex < cursor.length) {
+    if (
+      Number.isInteger(itemIndex) &&
+      itemIndex >= 0 &&
+      itemIndex < cursor.length
+    ) {
       cursor[itemIndex] = value;
     }
     return;

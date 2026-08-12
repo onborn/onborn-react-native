@@ -1,6 +1,6 @@
 {
   "name": "@onborn/runtime-ui-ir",
-  "version": "0.5.2-beta.2",
+  "version": "0.5.3-beta.1",
   "description": "Verified UI IR runtime used by Onborn client SDKs.",
   "license": "UNLICENSED",
   "private": false,
@@ -50,7 +50,7 @@
   "dependencies": {
     "@noble/ed25519": "3.1.0",
     "@noble/hashes": "2.2.0",
-    "@onborn/sdk-contracts": "0.6.1-beta.1",
+    "@onborn/sdk-contracts": "0.6.2-beta.1",
     "phosphor-react-native": "3.0.6"
   },
   "peerDependencies": {

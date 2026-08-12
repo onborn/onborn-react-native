@@ -91,16 +91,11 @@ const RestoreActionSchema = z
   })
   .strict();
 
-export const BuilderV2RuntimeSemanticActionSchema = z.discriminatedUnion(
-  "type",
-  [
+export const BuilderV2RuntimeSemanticActionSchema = z
+  .discriminatedUnion("type", [
     z
       .object({
-        type: z.enum([
-          "flow_completed",
-          "flow_skipped",
-          "flow_dismissed",
-        ]),
+        type: z.enum(["flow_completed", "flow_skipped", "flow_dismissed"]),
       })
       .strict(),
     ScreenActionSchema,
@@ -109,16 +104,16 @@ export const BuilderV2RuntimeSemanticActionSchema = z.discriminatedUnion(
     ExperimentActionSchema,
     PaywallActionSchema,
     RestoreActionSchema,
-  ],
-).superRefine((action, context) => {
-  if (action.type === "purchase_completed" && !action.productId) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Completed purchases require a product ID",
-      path: ["productId"],
-    });
-  }
-});
+  ])
+  .superRefine((action, context) => {
+    if (action.type === "purchase_completed" && !action.productId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Completed purchases require a product ID",
+        path: ["productId"],
+      });
+    }
+  });
 
 export const BuilderV2RuntimeAnalyticsEventSchema = z
   .object({
@@ -203,6 +198,4 @@ export type BuilderV2RuntimeAnalyticsEvent = z.infer<
 export type BuilderV2RuntimeStartedEvent = z.infer<
   typeof BuilderV2RuntimeStartedEventSchema
 >;
-export type BuilderV2RuntimeEvent = z.infer<
-  typeof BuilderV2RuntimeEventSchema
->;
+export type BuilderV2RuntimeEvent = z.infer<typeof BuilderV2RuntimeEventSchema>;
