@@ -23,7 +23,7 @@ import type { UiIrArtifactDeliveryPort } from "../ports/ui-ir-artifact-delivery"
 
 export type RefreshUiIrArtifactResult = {
   artifact: CachedUiIrArtifact;
-  source: "network" | "last-known-good";
+  source: "network" | "last-known-good" | "cache-current";
   failureCode?: UiIrArtifactFailureCode;
 };
 
@@ -55,6 +55,22 @@ export async function refreshUiIrArtifact(
     assertDeliveryFresh(delivery, dependencies.clock?.now() ?? Date.now());
     assertCompatibility(delivery, input.host);
     await verifyArtifact(delivery, dependencies.crypto);
+    /*
+     * The server just named the release; if it is the one already activated on
+     * disk, there is nothing to download. Every mount used to re-fetch every
+     * file — document, image, fonts — for an artifact that had not changed,
+     * which is most of the spinner someone re-watching the onboarding sat
+     * through. The cached copy was integrity-checked file by file when it was
+     * staged, and the signature above proves the server's claim is authentic.
+     */
+    if (
+      lastKnownGood &&
+      lastKnownGood.release.releaseId === delivery.release.releaseId &&
+      lastKnownGood.artifact.manifest.artifactId ===
+        delivery.artifact.manifest.artifactId
+    ) {
+      return { artifact: lastKnownGood, source: "cache-current" };
+    }
     stageId = await stageDelivery(delivery, scope, dependencies);
     return {
       artifact: await dependencies.cache.activateStage(stageId),

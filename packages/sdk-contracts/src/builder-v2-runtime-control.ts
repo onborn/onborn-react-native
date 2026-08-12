@@ -36,7 +36,7 @@ export const BuilderV2RuntimeHealthEventSchema = z
     occurredAt: z.string().datetime(),
     durationMs: z.number().int().min(0).max(15 * 60 * 1000),
     source: z
-      .enum(["network", "last-known-good", "session-pinned"])
+      .enum(["network", "last-known-good", "session-pinned", "cache-current"])
       .optional(),
     artifactId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
     releaseId: z.string().regex(/^[a-f0-9]{64}$/).optional(),

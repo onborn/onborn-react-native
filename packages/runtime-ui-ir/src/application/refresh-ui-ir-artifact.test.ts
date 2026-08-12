@@ -57,7 +57,14 @@ describe("refreshUiIrArtifact", () => {
     assert.equal(document.screens[0]?.root.type, "safe-area-view");
   });
 
-  it("preserves last-known-good when a downloaded file is corrupted", async () => {
+  it("an unchanged release renders from disk without downloading", async () => {
+    /*
+     * Someone re-watching the onboarding: the server names the same release
+     * that is already activated on disk. Every file used to be re-downloaded
+     * anyway — document, image, fonts — which was most of the spinner. The
+     * download port here throws, so the test fails the moment any byte is
+     * fetched.
+     */
     const fixture = createDelivery();
     const cache = new InMemoryUiIrArtifactCache();
     const crypto = testCrypto(true);
@@ -76,8 +83,51 @@ describe("refreshUiIrArtifact", () => {
       {
         cache,
         crypto,
+        delivery: {
+          async fetchArtifact() {
+            return fixture.delivery;
+          },
+          async downloadFile(): Promise<Uint8Array> {
+            throw new Error("an unchanged release must not download anything");
+          },
+        },
+        clock: testClock,
+      },
+    );
+
+    assert.equal(result.source, "cache-current");
+    assert.equal(
+      result.artifact.artifact.manifest.artifactId,
+      first.artifact.artifact.manifest.artifactId,
+    );
+    assert.equal(result.failureCode, undefined);
+  });
+
+  it("preserves last-known-good when a downloaded file is corrupted", async () => {
+    const fixture = createDelivery();
+    const cache = new InMemoryUiIrArtifactCache();
+    const crypto = testCrypto(true);
+    const first = await refreshUiIrArtifact(
+      { flowId: "flow-1", environment: "test", host },
+      {
+        cache,
+        crypto,
+        delivery: deliveryPort(fixture.delivery, fixture.documentBytes),
+        clock: testClock,
+      },
+    );
+
+    // A *new* release whose download is corrupted. It has to differ from the
+    // cached one: an unchanged release short-circuits to disk and never
+    // downloads, so there would be nothing to corrupt.
+    const next = createDelivery({ releaseByte: "c", title: "Updated" });
+    const result = await refreshUiIrArtifact(
+      { flowId: "flow-1", environment: "test", host },
+      {
+        cache,
+        crypto,
         delivery: deliveryPort(
-          fixture.delivery,
+          next.delivery,
           new TextEncoder().encode('{"corrupted":true}'),
         ),
         clock: testClock,
@@ -141,8 +191,7 @@ describe("loadUiIrArtifactSession", () => {
         },
       ),
       (error: unknown) =>
-        error instanceof UiIrArtifactError &&
-        error.code === "runtime_disabled",
+        error instanceof UiIrArtifactError && error.code === "runtime_disabled",
     );
 
     assert.deepEqual(
@@ -179,7 +228,7 @@ describe("loadUiIrArtifactSession", () => {
   });
 });
 
-function createDelivery(): {
+function createDelivery(options?: { releaseByte?: string; title?: string }): {
   delivery: BuilderV2UiIrArtifactDelivery;
   documentBytes: Uint8Array;
 } {
@@ -199,7 +248,7 @@ function createDelivery(): {
               {
                 id: "welcome.title",
                 type: "text",
-                text: { kind: "literal", value: "Welcome" },
+                text: { kind: "literal", value: options?.title ?? "Welcome" },
               },
             ],
           },
@@ -242,7 +291,7 @@ function createDelivery(): {
     schemaVersion: 1,
     release: {
       schemaVersion: 1,
-      releaseId: "b".repeat(64),
+      releaseId: (options?.releaseByte ?? "b").repeat(64),
       flowId: "flow-1",
       environment: "test",
       source,
