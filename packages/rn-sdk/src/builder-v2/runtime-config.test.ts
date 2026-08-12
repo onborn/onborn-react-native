@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -35,9 +36,46 @@ test("advertises only capabilities implemented by the public host runtime", () =
       "image",
       "localization",
       "navigation",
+      "phosphor-icons",
       "safe-area",
     ],
   );
   assert.equal(manifest.runtimeVersion, "onborn-runtime-1");
   assert.equal(manifest.target, "ios");
+});
+
+/*
+ * The manifest is a promise, and an unkept one fails silently: an artifact
+ * requiring a capability the host does not name is judged incompatible, the
+ * runtime quietly serves the previous release instead, and the flow someone
+ * just published never appears on the device. That is how a published paywall
+ * went missing with every other part of the chain green.
+ *
+ * Naming a capability is therefore checked against actually shipping the code
+ * that backs it, so the promise cannot drift from the dependency list.
+ */
+test("every declared capability is backed by a package this SDK ships", () => {
+  const manifest = createBuilderV2HostManifest("ios");
+  const declared = new Set(manifest.capabilities.map(({ name }) => name));
+  const packageJson = JSON.parse(
+    readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+  ) as {
+    dependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+  };
+  const shipped = {
+    ...packageJson.dependencies,
+    ...packageJson.peerDependencies,
+  };
+
+  for (const [capability, packageName] of [
+    ["phosphor-icons", "phosphor-react-native"],
+    ["google-fonts", "expo-font"],
+    ["assets", "expo-file-system"],
+  ] as const) {
+    assert.ok(
+      !declared.has(capability) || packageName in shipped,
+      `the manifest promises "${capability}" but ${packageName} is not shipped`,
+    );
+  }
 });
