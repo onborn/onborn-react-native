@@ -47,3 +47,10 @@ yarn workspace @onborn/example-expo start
 public SDK packages.
 
 - [SDK contracts documentation](docs/rn-sdk/sdk-contracts.md)
+
+## License
+
+This repository is source-available, not open source. All rights are
+reserved by Onborn; see [LICENSE](LICENSE). You may read the code here, but
+use of the SDK in your app is licensed only through the official `@onborn/*`
+packages published on npm, under the Onborn terms of service.

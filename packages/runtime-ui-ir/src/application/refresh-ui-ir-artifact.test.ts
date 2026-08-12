@@ -103,6 +103,49 @@ describe("refreshUiIrArtifact", () => {
     assert.equal(result.failureCode, undefined);
   });
 
+  it("re-downloads an unchanged release when the cached copy no longer reads back", async () => {
+    /*
+     * "Already on disk" is a claim about the past: the files were hash-checked
+     * when staged, but disk is not immutable — an app update or a partial
+     * cleanup can invalidate them. Trusting the claim blindly strands the
+     * session, because nothing after the short-circuit downloads and the
+     * document loader then fails with no network fallback.
+     */
+    const fixture = createDelivery();
+    const cache = new InMemoryUiIrArtifactCache();
+    const crypto = testCrypto(true);
+    const first = await refreshUiIrArtifact(
+      { flowId: "flow-1", environment: "test", host },
+      {
+        cache,
+        crypto,
+        delivery: deliveryPort(fixture.delivery, fixture.documentBytes),
+        clock: testClock,
+      },
+    );
+    cache.seedFile(
+      first.artifact.files[0]!.uri,
+      new TextEncoder().encode('{"rotted":true}'),
+    );
+
+    const result = await refreshUiIrArtifact(
+      { flowId: "flow-1", environment: "test", host },
+      {
+        cache,
+        crypto,
+        delivery: deliveryPort(fixture.delivery, fixture.documentBytes),
+        clock: testClock,
+      },
+    );
+
+    assert.equal(result.source, "network");
+    const document = await loadCachedUiIrDocument(result.artifact, {
+      cache,
+      crypto,
+    });
+    assert.equal(document.entryScreenId, "welcome");
+  });
+
   it("preserves last-known-good when a downloaded file is corrupted", async () => {
     const fixture = createDelivery();
     const cache = new InMemoryUiIrArtifactCache();

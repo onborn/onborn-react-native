@@ -50,6 +50,39 @@ describe("PersistentUiIrArtifactCache", () => {
     );
   });
 
+  it("resolves file URIs against the current container, not the recorded one", async () => {
+    /*
+     * iOS moves the app's data container to a new UUID path on every app
+     * update: the cached files survive, but an absolute file:// URI recorded
+     * at activation time keeps pointing at the old container. Measured on a
+     * real device as `Cached UI IR document "ui-ir/document.json" is
+     * corrupted` on the first launch after an update.
+     */
+    const state = new MemoryStorageState();
+    const cache = new PersistentUiIrArtifactCache({
+      storage: new MemoryStorage(state, "container-a"),
+      createId: sequentialIds(),
+    });
+    const stageId = await cache.createStage(fixture());
+    await cache.writeStageFile({ stageId, file: FILE, bytes: DOCUMENT_BYTES });
+    await cache.activateStage(stageId);
+
+    const relocated = new PersistentUiIrArtifactCache({
+      storage: new MemoryStorage(state, "container-b"),
+      createId: sequentialIds(),
+    });
+    const active = await relocated.readActive({
+      flowId: "flow-1",
+      environment: "test",
+    });
+
+    assert.ok(active!.files[0]!.uri.startsWith("memory://container-b/"));
+    assert.deepEqual(
+      await relocated.readFile(active!.files[0]!.uri),
+      DOCUMENT_BYTES,
+    );
+  });
+
   it("rejects activation when a signed file was not staged", async () => {
     const cache = new PersistentUiIrArtifactCache({
       storage: new MemoryStorage(),
@@ -117,9 +150,28 @@ function sequentialIds(): () => string {
   return () => `id-${++value}`;
 }
 
+class MemoryStorageState {
+  readonly directories = new Set<string>();
+  readonly files = new Map<string, Uint8Array>();
+}
+
+/*
+ * Absolute URIs carry the container they were minted in, like the file://
+ * URIs of the real storage carry the iOS data container UUID. A URI from
+ * another container does not resolve — that is the behavior the relocation
+ * test depends on, so it must not be softened.
+ */
 class MemoryStorage implements PersistentUiIrStoragePort {
-  private readonly directories = new Set<string>();
-  private readonly files = new Map<string, Uint8Array>();
+  private readonly directories: Set<string>;
+  private readonly files: Map<string, Uint8Array>;
+
+  constructor(
+    state = new MemoryStorageState(),
+    private readonly container = "container-a",
+  ) {
+    this.directories = state.directories;
+    this.files = state.files;
+  }
 
   async ensureDirectory(path: string): Promise<void> {
     this.directories.add(path);
@@ -174,11 +226,11 @@ class MemoryStorage implements PersistentUiIrStoragePort {
   }
 
   uri(path: string): string {
-    return `memory://${path}`;
+    return `memory://${this.container}/${path}`;
   }
 
   async writeBytes(path: string, bytes: Uint8Array): Promise<void> {
-    this.files.set(path, bytes.slice());
+    this.files.set(this.path(path), bytes.slice());
   }
 
   async writeText(path: string, value: string): Promise<void> {
@@ -186,8 +238,11 @@ class MemoryStorage implements PersistentUiIrStoragePort {
   }
 
   private path(value: string): string {
-    return value.startsWith("memory://")
-      ? value.slice("memory://".length)
-      : value;
+    if (!value.startsWith("memory://")) return value;
+    const prefix = `memory://${this.container}/`;
+    if (!value.startsWith(prefix)) {
+      throw new Error(`URI from a foreign container: "${value}".`);
+    }
+    return value.slice(prefix.length);
   }
 }

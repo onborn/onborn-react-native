@@ -36,9 +36,7 @@ export type PersistentUiIrArtifactCacheOptions = {
   now?: () => number;
 };
 
-export class PersistentUiIrArtifactCache
-  implements UiIrArtifactCachePort
-{
+export class PersistentUiIrArtifactCache implements UiIrArtifactCachePort {
   private readonly mutex = new AsyncMutex();
   private readonly now: () => number;
 
@@ -56,9 +54,7 @@ export class PersistentUiIrArtifactCache
       .sort()
       .reverse();
     const latest = pointers[0];
-    return latest
-      ? this.readCachedArtifact(`${directory}/${latest}`)
-      : null;
+    return latest ? this.readCachedArtifact(`${directory}/${latest}`) : null;
   }
 
   async readFile(uri: string): Promise<Uint8Array | null> {
@@ -187,26 +183,39 @@ export class PersistentUiIrArtifactCache
     }
   }
 
-  private async writeStage(
-    stageId: string,
-    stage: StageRecord,
-  ): Promise<void> {
+  private async writeStage(stageId: string, stage: StageRecord): Promise<void> {
     await this.options.storage.writeText(
       `${stageDirectory(stageId)}/stage.json`,
       JSON.stringify(stage),
     );
   }
 
-  private async readCachedArtifact(
-    path: string,
-  ): Promise<CachedUiIrArtifact> {
+  private async readCachedArtifact(path: string): Promise<CachedUiIrArtifact> {
+    let record: CachedUiIrArtifact;
     try {
-      return CachedUiIrArtifactSchema.parse(
+      record = CachedUiIrArtifactSchema.parse(
         JSON.parse(await this.options.storage.readText(path)),
       );
     } catch (error) {
       throw uiIrStorageError("Cached UI IR artifact is invalid.", error);
     }
+    /*
+     * The recorded URIs are absolute and carry the data container they were
+     * minted in; iOS moves that container to a new UUID path on every app
+     * update, so they go stale while the files themselves survive. The layout
+     * under the root is ours, so the URI is derived from it on every read
+     * instead of trusted from the record.
+     */
+    const directory = `artifacts/${record.artifact.manifest.artifactId}`;
+    return {
+      ...record,
+      files: record.files.map((file) => ({
+        ...file,
+        uri: this.options.storage.uri(
+          `${directory}/files/${assertSafeUiIrPath(file.path)}`,
+        ),
+      })),
+    };
   }
 
   private nextId(label: string): string {

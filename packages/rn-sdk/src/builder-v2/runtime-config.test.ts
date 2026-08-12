@@ -31,6 +31,7 @@ test("advertises only capabilities implemented by the public host runtime", () =
       "analytics",
       "assets",
       "billing",
+      "google-fonts",
       "image",
       "localization",
       "navigation",

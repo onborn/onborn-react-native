@@ -67,7 +67,8 @@ export async function refreshUiIrArtifact(
       lastKnownGood &&
       lastKnownGood.release.releaseId === delivery.release.releaseId &&
       lastKnownGood.artifact.manifest.artifactId ===
-        delivery.artifact.manifest.artifactId
+        delivery.artifact.manifest.artifactId &&
+      (await cachedArtifactReadsBack(lastKnownGood, dependencies))
     ) {
       return { artifact: lastKnownGood, source: "cache-current" };
     }
@@ -175,6 +176,34 @@ function assertCachedCompatibility(
       "The last-known-good UI IR is incompatible with this host.",
     );
   }
+}
+
+/*
+ * "Already on disk" is a claim about the past: the files were hash-checked
+ * when they were staged, but disk is not immutable — an app update or a
+ * partial cleanup can invalidate them. Trusting the claim blindly strands the
+ * session, because nothing after the short-circuit downloads and the document
+ * loader then fails with no network fallback. Reading the files back is local
+ * IO, still far cheaper than the downloads it avoids.
+ */
+async function cachedArtifactReadsBack(
+  cached: CachedUiIrArtifact,
+  dependencies: {
+    cache: Pick<UiIrArtifactCachePort, "readFile">;
+    crypto: Pick<UiIrArtifactCryptoPort, "sha256">;
+  },
+): Promise<boolean> {
+  for (const file of cached.files) {
+    const bytes = await dependencies.cache.readFile(file.uri);
+    if (
+      !bytes ||
+      bytes.byteLength !== file.byteLength ||
+      dependencies.crypto.sha256(bytes) !== file.contentHash
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 async function verifyArtifact(
