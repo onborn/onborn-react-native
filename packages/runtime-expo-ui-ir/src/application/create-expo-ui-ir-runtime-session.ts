@@ -30,6 +30,7 @@ import type {
 } from "../ports/expo-ui-ir-runtime";
 import { createExpoUiIrActionPorts } from "./create-expo-ui-ir-action-ports";
 import { createExpoUiIrAssetResolver } from "./create-expo-ui-ir-asset-resolver";
+import { loadUiIrArtifactFonts } from "../infrastructure/expo-font-ui-ir-font-loader";
 
 export type ExpoUiIrRuntimeSession = {
   artifact: CachedUiIrArtifact;
@@ -65,6 +66,8 @@ export type ExpoUiIrRuntimeSessionDependencies = {
   createAnalytics?: ExpoUiIrAnalyticsFactory;
   billing?: ExpoUiIrBillingPort;
   cache: UiIrArtifactCachePort;
+  /** Overridable for tests; defaults to expo-font against staged files. */
+  loadFonts?: (artifact: CachedUiIrArtifact) => Promise<void>;
   capabilities?: ExpoUiIrCapabilityPort;
   clock?: UiIrArtifactClockPort;
   crypto: UiIrArtifactCryptoPort;
@@ -83,6 +86,9 @@ export async function createExpoUiIrRuntimeSession(
   assertNativeHost(input.host);
   assertAnalyticsConfiguration(dependencies);
   const refreshed = await loadUiIrArtifactSession(input, dependencies);
+  // Typography is part of the artifact; the session is not ready until the
+  // fonts it shipped are loadable by name.
+  await (dependencies.loadFonts ?? loadUiIrArtifactFonts)(refreshed.artifact);
   const document = await loadCachedUiIrDocument(refreshed.artifact, {
     cache: dependencies.cache,
     crypto: dependencies.crypto,

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { BuilderV2ArtifactGoogleFontSchema } from "./builder-v2-google-fonts";
+
 import {
   BuilderV2ArtifactSignatureSchema,
   BuilderV2ArtifactSourceSchema,
@@ -35,6 +37,7 @@ export const BuilderV2UiIrArtifactFileRoleSchema = z.enum([
   "document",
   "source_references",
   "asset",
+  "font",
 ]);
 
 export const BuilderV2UiIrArtifactFileSchema = z
@@ -60,12 +63,43 @@ export const BuilderV2UiIrArtifactManifestSchema = z
       })
       .strict(),
     files: z.array(BuilderV2UiIrArtifactFileSchema).min(1).max(2_000),
+    /**
+     * The Google Fonts the document's text renders in, embedded as files.
+     *
+     * Embedded rather than fetched at runtime: the artifact is signed, so its
+     * typography has to be part of what was signed — and a device offline
+     * after first launch still renders the design, not a system-font fallback.
+     */
+    fonts: z.array(BuilderV2ArtifactGoogleFontSchema).max(64).optional(),
     requiredCapabilities: z.array(BuilderV2CapabilityRequirementSchema).max(64),
     instrumentation: BuilderV2InstrumentationManifestSchema.optional(),
   })
   .strict()
   .superRefine((manifest, context) => {
     addDuplicatePathIssues(manifest.files, ["files"], context);
+    for (const [index, font] of (manifest.fonts ?? []).entries()) {
+      const file = manifest.files.find(
+        (candidate) => candidate.path === font.file,
+      );
+      if (!file || file.role !== "font") {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Every declared font must be carried as a font file",
+          path: ["fonts", index, "file"],
+        });
+        continue;
+      }
+      if (
+        file.contentHash !== font.contentHash ||
+        file.byteLength !== font.byteLength
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "A declared font must match its carried file byte for byte",
+          path: ["fonts", index, "contentHash"],
+        });
+      }
+    }
     addDuplicateCapabilityIssues(manifest.requiredCapabilities, context);
     const entry = manifest.files.find(
       (file) =>
