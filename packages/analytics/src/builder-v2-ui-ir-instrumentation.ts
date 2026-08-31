@@ -8,6 +8,8 @@ import type {
 export type SignedScreenContext = {
   position: number;
   surface: "onboarding" | "paywall";
+  /** The selections this screen declares, with every value it can hold. */
+  answers: Map<string, Set<string | null>>;
 };
 
 export type SignedUiIrAnalyticsContext = {
@@ -90,9 +92,55 @@ function indexSignedScreens(
         `UI IR signed screen instrumentation does not match "${screen.screenId}".`,
       );
     }
-    screens.set(screen.screenId, { position, surface: screen.surface });
+    screens.set(screen.screenId, {
+      position,
+      surface: screen.surface,
+      answers: indexScreenAnswers(screen),
+    });
   });
   return screens;
+}
+
+/**
+ * What each named selection on a screen is allowed to report.
+ *
+ * The initial value plus every value a `state.set` action in the same screen
+ * can write. Reporting is then bounded by the document itself: a runtime that
+ * claimed some other answer is claiming the screen could produce a value it
+ * demonstrably cannot.
+ */
+function indexScreenAnswers(
+  screen: BuilderV2UiIrDocument["screens"][number],
+): Map<string, Set<string | null>> {
+  const answers = new Map<string, Set<string | null>>();
+  for (const [name, state] of Object.entries(screen.state ?? {})) {
+    answers.set(name, new Set<string | null>([state.initial]));
+  }
+  collectStateSetValues(screen.root, answers);
+  return answers;
+}
+
+function collectStateSetValues(
+  node: unknown,
+  answers: Map<string, Set<string | null>>,
+): void {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    for (const item of node) collectStateSetValues(item, answers);
+    return;
+  }
+  const record = node as Record<string, unknown>;
+  if (
+    record.type === "state.set" &&
+    typeof record.state === "string" &&
+    (typeof record.value === "string" || record.value === null)
+  ) {
+    const values = answers.get(record.state);
+    if (values) values.add(record.value as string | null);
+  }
+  for (const value of Object.values(record)) {
+    collectStateSetValues(value, answers);
+  }
 }
 
 function indexSignedInteractions(

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0-beta.1
+
+- Synced with the platform: plan snapshots for paywall price bindings; V1 paywall hook removed.
+
 ## 0.1.0-beta.9
 
 - `resolveOnbornBillingConfig` now treats `onboardingFlowName` and `paywallName` as global

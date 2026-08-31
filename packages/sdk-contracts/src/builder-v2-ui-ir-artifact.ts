@@ -13,6 +13,7 @@ import {
   BuilderV2RuntimeVersionSchema,
 } from "./builder-v2-runtime-platform";
 import { BUILDER_V2_UI_IR_FORMAT } from "./builder-v2-ui-ir";
+import { RuntimeExperimentAssignmentSchema } from "./experiment";
 
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 const RelativeArtifactPathSchema = z
@@ -148,6 +149,13 @@ export const BuilderV2UiIrArtifactDeliverySchema = z
     artifact: BuilderV2SignedUiIrArtifactSchema,
     files: z.array(BuilderV2UiIrArtifactDeliveryFileSchema).min(1).max(2_000),
     expiresAt: z.string().datetime(),
+    /**
+     * The experiment assignment this delivery serves, when a running
+     * experiment assigned one. The schema is strict, so the server includes
+     * it only for clients that asked (`assignment=1`) — a delivery parsed by
+     * an older SDK never carries an unrecognized key.
+     */
+    experiment: RuntimeExperimentAssignmentSchema.optional(),
   })
   .strict()
   .superRefine((delivery, context) => {

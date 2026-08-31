@@ -3,10 +3,24 @@ import { z } from "zod";
 export const BUILDER_V2_THEME_FILE_PATH = "theme.ts";
 export const BUILDER_V2_THEME_SCHEMA_VERSION = 1 as const;
 
+/*
+ * Six digits, or eight when the colour carries alpha.
+ *
+ * Six-only was the whole palette's rule, and it had no answer for the colours
+ * a screen genuinely needs translucent: a shadow, a scrim over a photograph,
+ * a hairline that has to sit on two backgrounds. A run died on exactly that —
+ * `custom.shadow` written with alpha, rejected by this regex, and the failure
+ * surfaced as a broken theme file rather than as a missing feature. React
+ * Native and CSS both read #RRGGBBAA natively, so the shorter rule was ours
+ * alone.
+ */
 const ThemeColorSchema = z
   .string()
   .trim()
-  .regex(/^#[0-9A-Fa-f]{6}$/, "Theme colors must use six-digit hex values");
+  .regex(
+    /^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$/,
+    "Theme colors must be hex values: #RRGGBB, or #RRGGBBAA when the colour carries alpha",
+  );
 
 /**
  * One role in the type scale, complete enough to author a screen from.
@@ -31,6 +45,27 @@ const ThemeFontSchema = z
   })
   .strict();
 
+/**
+ * A colour the agent added because a screen needed one the base palette lacks.
+ *
+ * The base palette was the only palette, so a second screen of a recreated
+ * product whose CTA was a different colour had one legal move: rewrite
+ * `primary`. It did, and the first screen — which read `primary` too —
+ * changed colour underneath the person who had just approved it. Custom
+ * colours are the other move: the token is added beside the base ones, named
+ * for what it is rather than where it was first used ("accentLavender", not
+ * "paywallCta"), and every later screen that needs the same colour finds it
+ * here instead of declaring it again.
+ *
+ * Bounded and strictly named: a palette that grows one token per screen is
+ * not a palette.
+ */
+const CustomColorNameSchema = z
+  .string()
+  .regex(/^[a-z][a-zA-Z0-9]{1,39}$/, "custom colour names are camelCase identifiers");
+
+export const BUILDER_V2_MAX_CUSTOM_COLORS = 24;
+
 export const BuilderV2ThemeModeSchema = z
   .object({
     colors: z
@@ -44,6 +79,13 @@ export const BuilderV2ThemeModeSchema = z
         text: ThemeColorSchema,
         muted: ThemeColorSchema,
         border: ThemeColorSchema,
+        custom: z
+          .record(CustomColorNameSchema, ThemeColorSchema)
+          .refine(
+            (value) => Object.keys(value).length <= BUILDER_V2_MAX_CUSTOM_COLORS,
+            `At most ${BUILDER_V2_MAX_CUSTOM_COLORS} custom colours`,
+          )
+          .optional(),
       })
       .strict(),
   })
@@ -61,11 +103,18 @@ export const BuilderV2ThemeSchema = z
         label: ThemeFontSchema,
       })
       .strict(),
+    /*
+     * A pill is written as a very large radius — `borderRadius: 999` is the
+     * React Native idiom, and the platform clamps it to half the element, so
+     * the number is a shape instruction rather than a measurement. Capping at
+     * 96 refused the most common button shape in mobile onboarding and killed
+     * runs that asked for one, so the bound only has to stop nonsense.
+     */
     radii: z
       .object({
-        card: z.number().finite().min(0).max(96),
-        button: z.number().finite().min(0).max(96),
-        input: z.number().finite().min(0).max(96),
+        card: z.number().finite().min(0).max(9_999),
+        button: z.number().finite().min(0).max(9_999),
+        input: z.number().finite().min(0).max(9_999),
       })
       .strict(),
     spacing: z

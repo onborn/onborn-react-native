@@ -1,47 +1,12 @@
 import { z } from "zod";
-import { RuntimeExperimentAssignmentSchema } from "./experiment";
-import { LayoutConfigSchema } from "./layout";
-import type { FlowTheme } from "./theme";
-import {
-  AnimatedAssetPrimitiveSchema,
-  BadgePrimitiveSchema,
-  CarouselPaginationPrimitiveSchema,
-  CarouselPrimitiveSchema,
-  CTAButtonPrimitiveSchema,
-  IconPrimitiveSchema,
-  ImagePrimitiveSchema,
-  SubtitlePrimitiveSchema,
-  TestimonialCardPrimitiveSchema,
-  TextFontFamilySchema,
-  TitlePrimitiveSchema,
-  XStackPrimitiveSchema,
-  YStackPrimitiveSchema,
-} from "./primitives";
-import { FlowThemeSchema } from "./theme";
-import { FlowTranslationsSchema } from "./translations";
-import {
-  PaywallFeatureListPrimitiveSchema,
-  PaywallLegalTextPrimitiveSchema,
-  PaywallCloseButtonPrimitiveSchema,
-  PaywallPackageCardPrimitiveSchema,
-  PaywallPackageListPrimitiveSchema,
-  PaywallPackageSelectorPrimitiveSchema,
-  PaywallPriceTextPrimitiveSchema,
-  PaywallRestorePurchasesButtonPrimitiveSchema,
-  PaywallTermsLinksPrimitiveSchema,
-  PaywallTrialTextPrimitiveSchema,
-} from "./paywall-primitives";
 
-export {
-  migratePaywallPrimitiveEntry,
-  normalizePackageSelectorProps,
-  isDeprecatedPaywallPackagePrimitiveType,
-} from "./paywall-primitives";
-export type {
-  NormalizedPackageSelectorProps,
-  PackageSelectorLayout,
-  PaywallTermsLink,
-} from "./paywall-primitives";
+/**
+ * Billing and purchase contracts.
+ *
+ * What the SDK sends to sell something and what it gets back. The paywall
+ * itself is a screen inside a published flow, described by the UI IR
+ * document, so nothing here describes how a paywall looks.
+ */
 
 export const BillingEnvironmentSchema = z.enum(["test", "prod"]);
 
@@ -220,113 +185,6 @@ export const BillingRuntimeConfigSchema = z
   })
   .strict();
 
-export const PaywallPrimitiveSchema = z.union([
-  TitlePrimitiveSchema,
-  SubtitlePrimitiveSchema,
-  ImagePrimitiveSchema,
-  AnimatedAssetPrimitiveSchema,
-  CarouselPrimitiveSchema,
-  CarouselPaginationPrimitiveSchema,
-  TestimonialCardPrimitiveSchema,
-  BadgePrimitiveSchema,
-  IconPrimitiveSchema,
-  CTAButtonPrimitiveSchema,
-  XStackPrimitiveSchema,
-  YStackPrimitiveSchema,
-  PaywallPackageSelectorPrimitiveSchema,
-  PaywallPackageCardPrimitiveSchema,
-  PaywallPackageListPrimitiveSchema,
-  PaywallPriceTextPrimitiveSchema,
-  PaywallTrialTextPrimitiveSchema,
-  PaywallFeatureListPrimitiveSchema,
-  PaywallRestorePurchasesButtonPrimitiveSchema,
-  PaywallCloseButtonPrimitiveSchema,
-  PaywallLegalTextPrimitiveSchema,
-  PaywallTermsLinksPrimitiveSchema,
-]);
-
-export const PaywallPrimitivesSchema = z.record(
-  z.string(),
-  PaywallPrimitiveSchema,
-);
-
-export const PAYWALL_LAYOUT_PRESET_VALUES = [
-  "content_focused",
-  "hero",
-  "hero_sheet",
-  "split",
-] as const;
-
-export const PaywallLayoutPresetSchema = z.enum(PAYWALL_LAYOUT_PRESET_VALUES);
-
-export const PaywallLayoutConfigSchema = z
-  .object({
-    preset: PaywallLayoutPresetSchema.optional(),
-    bg: LayoutConfigSchema.shape.bg,
-    fontFamily: TextFontFamilySchema.optional(),
-    safeArea: z.boolean().optional(),
-  })
-  .strict();
-
-export const PaywallStepSchema = z
-  .object({
-    id: z.string(),
-    label: z.string(),
-    type: z.literal("paywall"),
-    layout: PaywallLayoutConfigSchema.extend({
-      preset: PaywallLayoutPresetSchema,
-    }).strict(),
-    primitives: PaywallPrimitivesSchema,
-  })
-  .strict();
-
-export const PaywallStatusSchema = z.enum(["draft", "published"]);
-
-export const PaywallConfigSchema = z
-  .object({
-    id: z.string().min(1),
-    flowId: z.string().min(1).optional(),
-    version: z.number().int().min(1),
-    name: z.string().min(1),
-    environment: BillingEnvironmentSchema,
-    offeringId: z.string().min(1).optional(),
-    layout: PaywallLayoutConfigSchema.optional(),
-    theme: FlowThemeSchema.optional(),
-    translations: FlowTranslationsSchema.optional(),
-    primitives: PaywallPrimitivesSchema.default({}),
-    status: PaywallStatusSchema.optional(),
-  })
-  .strict();
-
-export const PaywallPlacementSchema = z
-  .object({
-    id: z.string().min(1),
-    flowId: z.string().min(1),
-    paywallId: z.string().min(1),
-    environment: BillingEnvironmentSchema,
-    placement: z.enum(["after_step", "manual_step", "flow_end"]),
-    stepId: z.string().min(1).optional(),
-    trigger: z.string().optional(),
-  })
-  .strict()
-  .superRefine((placement, ctx) => {
-    if (placement.placement === "after_step" && !placement.stepId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["stepId"],
-        message: "stepId is required for after_step paywall placement",
-      });
-    }
-  });
-
-export const GetPaywallResponseSchema = z.object({
-  paywall: PaywallConfigSchema,
-  offering: BillingOfferingSchema.optional(),
-  products: z.array(BillingProductSchema).default([]),
-  billing: BillingRuntimeConfigSchema.optional(),
-  experiment: RuntimeExperimentAssignmentSchema.optional(),
-});
-
 export const GetOfferingResponseSchema = z.object({
   offering: BillingOfferingSchema,
   products: z.array(BillingProductSchema).default([]),
@@ -359,7 +217,10 @@ export const ValidatePurchaseRequestSchema = z
   .object({
     idempotencyKey: z.string().trim().min(1).max(240),
     userId: z.string().trim().min(1).max(240).optional(),
+    /** The paywall screen the purchase started from. */
     paywallId: z.string().trim().min(1).optional(),
+    /** The flow that screen belongs to, for revenue attribution. */
+    flowId: z.string().trim().min(1).max(160).optional(),
     offeringId: z.string().trim().min(1),
     packageId: z.string().trim().min(1),
     productId: z.string().trim().min(1).optional(),
@@ -427,34 +288,7 @@ export type BillingEntitlement = z.infer<typeof BillingEntitlementSchema>;
 export type BillingPackage = z.infer<typeof BillingPackageSchema>;
 export type BillingOffering = z.infer<typeof BillingOfferingSchema>;
 export type BillingRuntimeConfig = z.infer<typeof BillingRuntimeConfigSchema>;
-export type PaywallPrimitive = z.infer<typeof PaywallPrimitiveSchema>;
-export type PaywallPrimitives = z.infer<typeof PaywallPrimitivesSchema>;
-export type PaywallStep = z.infer<typeof PaywallStepSchema>;
-export type PaywallStatus = z.infer<typeof PaywallStatusSchema>;
-export type PaywallConfig = z.infer<typeof PaywallConfigSchema>;
-export type PaywallPlacement = z.infer<typeof PaywallPlacementSchema>;
 
-/** Step ids for paywall screens injected into a flow or opened standalone. */
-export function isPaywallStepId(stepId: string): boolean {
-  return stepId.startsWith("paywall:");
-}
-
-/** Funnel theme with paywall-specific overrides (colors, fonts, buttons, components). */
-export function mergePaywallFlowTheme(
-  funnelTheme: FlowTheme | undefined,
-  paywallTheme: FlowTheme | undefined,
-): FlowTheme | undefined {
-  if (!funnelTheme && !paywallTheme) {
-    return undefined;
-  }
-  return {
-    colors: { ...funnelTheme?.colors, ...paywallTheme?.colors },
-    fonts: { ...funnelTheme?.fonts, ...paywallTheme?.fonts },
-    buttons: paywallTheme?.buttons ?? funnelTheme?.buttons,
-    components: { ...funnelTheme?.components, ...paywallTheme?.components },
-  };
-}
-export type GetPaywallResponse = z.infer<typeof GetPaywallResponseSchema>;
 export type GetOfferingResponse = z.infer<typeof GetOfferingResponseSchema>;
 export type PurchaseStatus = z.infer<typeof PurchaseStatusSchema>;
 export type CustomerEntitlement = z.infer<typeof CustomerEntitlementSchema>;

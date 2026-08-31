@@ -36,6 +36,13 @@ import type { CustomerEntitlement } from "@onborn/sdk-contracts";
 import { resolveOnbornRuntimeConfig } from "../config/Onborn";
 import { createBuilderV2BillingPort } from "./billing-port";
 import { createBuilderV2PlanSnapshot } from "./plan-snapshot";
+import {
+  createOnbornCapabilityPort,
+  hostCapabilityNames,
+  type OnbornHostCapabilities,
+} from "./host-capabilities";
+import { OnbornLottie } from "./OnbornLottie";
+import type { BuilderV2HostCapability } from "./runtime-manifest";
 import { readUiIrOfferingKey } from "@onborn/runtime-ui-ir";
 import {
   ONBORN_BUILDER_V2_API_BASE_URL,
@@ -45,6 +52,7 @@ import {
 import { createBuilderV2HostManifest } from "./runtime-manifest";
 import { createBuilderV2RuntimeId } from "./runtime-id";
 import { BUILDER_V2_TRUSTED_UI_IR_KEYS } from "./trusted-ui-ir-keys";
+import { phosphorUiIrIconRegistry } from "@onborn/runtime-ui-ir/phosphor";
 
 export type OnbornFlowProps = {
   flowId: string;
@@ -55,9 +63,38 @@ export type OnbornFlowProps = {
   onEntitlementsChanged?: (entitlements: CustomerEntitlement[]) => void;
   renderLoading?: () => ReactNode;
   renderError?: (error: Error, retry: () => void) => ReactNode;
+  /**
+   * Native capabilities this app lends to the flow.
+   *
+   * Notifications and the rest need a config plugin and permission strings that
+   * belong to the app, so the SDK carries the app's implementation rather than
+   * providing one — and the host manifest promises a capability only when it
+   * actually arrived here.
+   */
+  capabilities?: OnbornHostCapabilities;
 };
 
 export function OnbornFlow(props: OnbornFlowProps): ReactNode {
+  return <OnbornUiIrPresentation {...props} />;
+}
+
+/**
+ * One artifact, rendered either as the journey or as a single paywall.
+ *
+ * Everything below the flow id is the same for both: the same delivery, cache,
+ * crypto, analytics bridge, billing port and host manifest. Only what the
+ * session presents differs, so a standalone paywall is this component with a
+ * placement rather than a second copy of the wiring — which is the only way the
+ * two can be trusted to behave the same on a device.
+ */
+export type OnbornUiIrPresentationProps = OnbornFlowProps & {
+  /** Present this standalone paywall instead of walking the journey. */
+  placement?: string;
+};
+
+export function OnbornUiIrPresentation(
+  props: OnbornUiIrPresentationProps,
+): ReactNode {
   const config = resolveOnbornRuntimeConfig();
   const target = resolveBuilderV2Target(Platform.OS);
   const environment = resolveBuilderV2Environment(config.apiKey);
@@ -73,6 +110,8 @@ export function OnbornFlow(props: OnbornFlowProps): ReactNode {
   const [offeringKey, setOfferingKey] = useState<string | undefined>(undefined);
   const offering = useOnbornOffering({
     ...(offeringKey ? { offeringKey } : {}),
+    // Purchases carry the flow so revenue lands on the flow that earned it.
+    flowId: props.flowId,
     billingAdapter: nativeStore.billingAdapter,
     onEntitlementsChanged: (entitlements) => {
       callbacks.current.onEntitlementsChanged?.(entitlements);
@@ -93,16 +132,31 @@ export function OnbornFlow(props: OnbornFlowProps): ReactNode {
     [offering.loading, offering.packages],
   );
 
+  const hostCapabilityNamesKey = hostCapabilityNames(props.capabilities).join(
+    ",",
+  );
   const input = useMemo(
     () => ({
       flowId: props.flowId,
       environment,
-      host: createBuilderV2HostManifest(target),
+      host: createBuilderV2HostManifest(target, {
+        hostCapabilities: hostCapabilityNamesKey
+          ? (hostCapabilityNamesKey.split(",") as BuilderV2HostCapability[])
+          : [],
+      }),
+      ...(props.placement ? { placement: props.placement } : {}),
       ...(props.initialScreenId
         ? { initialScreenId: props.initialScreenId }
         : {}),
     }),
-    [environment, props.flowId, props.initialScreenId, target],
+    [
+      environment,
+      hostCapabilityNamesKey,
+      props.flowId,
+      props.initialScreenId,
+      props.placement,
+      target,
+    ],
   );
   const dependencies = useRuntimeDependencies({
     apiKey: config.apiKey,
@@ -110,9 +164,18 @@ export function OnbornFlow(props: OnbornFlowProps): ReactNode {
     environment,
     flowId: props.flowId,
     fetchImpl: config.fetchImpl,
+    // Experiment assignment happens where the artifact is served, so the
+    // request has to say who it is for. Onborn.init fills userId in, with a
+    // generated one when the app passed none. Country and app version ride
+    // along when the app reported them — they are what the audience gates
+    // (selected countries, minimum version) hold against.
+    ...(config.userId ? { userId: config.userId } : {}),
+    ...(config.country ? { country: config.country } : {}),
+    ...(config.appVersion ? { appVersion: config.appVersion } : {}),
     offeringRef,
     target,
     callbacks,
+    capabilities: props.capabilities,
   });
 
   return (
@@ -122,7 +185,14 @@ export function OnbornFlow(props: OnbornFlowProps): ReactNode {
       locale={props.locale ?? config.locale}
       plans={plans}
       onSessionReady={(session) => {
-        setOfferingKey(readUiIrOfferingKey(session.document));
+        // A standalone paywall may sell an offering of its own, so which one to
+        // load depends on what is being presented, not on the document alone.
+        setOfferingKey(
+          readUiIrOfferingKey(
+            session.document,
+            props.placement ? { placement: props.placement } : undefined,
+          ),
+        );
       }}
       renderLoading={props.renderLoading}
       renderError={props.renderError}
@@ -142,6 +212,7 @@ function useLatestCallbacks(props: LatestCallbacks) {
 }
 
 function useRuntimeDependencies(input: {
+  capabilities?: OnbornHostCapabilities;
   apiKey: string;
   emitAnalyticsEvents: boolean;
   environment: "test" | "prod";
@@ -150,6 +221,9 @@ function useRuntimeDependencies(input: {
   offeringRef: MutableRefObject<UseOnbornOfferingState>;
   target: "ios" | "android";
   callbacks: MutableRefObject<LatestCallbacks>;
+  userId?: string;
+  country?: string;
+  appVersion?: string;
 }): ExpoUiIrRuntimeSessionDependencies {
   const sessionId = useRef(createBuilderV2RuntimeId("flow"));
   const storage = useMemo(() => new ExpoFileSystemUiIrStorage(), []);
@@ -171,8 +245,12 @@ function useRuntimeDependencies(input: {
         apiBaseUrl: ONBORN_BUILDER_V2_API_BASE_URL,
         apiKey: input.apiKey,
         fetchImpl: input.fetchImpl,
+        ...(input.userId ? { userId: input.userId } : {}),
+        ...(input.country ? { country: input.country } : {}),
+        ...(input.appVersion ? { appVersion: input.appVersion } : {}),
+        sessionId: sessionId.current,
       }),
-    [input.apiKey, input.fetchImpl],
+    [input.apiKey, input.appVersion, input.country, input.fetchImpl, input.userId],
   );
   const control = useMemo(
     () =>
@@ -211,6 +289,14 @@ function useRuntimeDependencies(input: {
     [input.callbacks],
   );
 
+  const capabilities = useMemo(
+    () =>
+      createOnbornCapabilityPort(input.capabilities, {
+        lottie: (props) => <OnbornLottie {...props} />,
+      }),
+    [input.capabilities],
+  );
+
   return useMemo(
     () => ({
       cache,
@@ -219,6 +305,10 @@ function useRuntimeDependencies(input: {
       delivery,
       diagnostics,
       billing,
+      // The complete set: the artifact names icons at runtime, and on a
+      // device the registry's weight is a non-issue. See UiIrIconRegistryPort.
+      icons: phosphorUiIrIconRegistry,
+      ...(capabilities ? { capabilities } : {}),
       ...(createAnalytics ? { createAnalytics } : {}),
       onComplete,
       onDismiss,
@@ -226,6 +316,7 @@ function useRuntimeDependencies(input: {
     [
       billing,
       cache,
+      capabilities,
       control,
       createAnalytics,
       crypto,
@@ -247,7 +338,7 @@ function createAnalyticsFactory(
   sessionId: string,
 ): ExpoUiIrAnalyticsFactory | undefined {
   if (!input.emitAnalyticsEvents) return undefined;
-  return ({ artifact, document }) =>
+  return ({ artifact, document, experiment }) =>
     createBuilderV2UiIrAnalyticsBridge({
       flowId: input.flowId,
       environment: input.environment,
@@ -256,6 +347,9 @@ function createAnalyticsFactory(
       release: artifact.release,
       document,
       sessionId,
+      // The delivery's assignment stamp: this is what joins the session's
+      // events to the experiment variant it was served.
+      ...(experiment ? { experiment } : {}),
       emit: async (event) => {
         await AnalyticsOnborn.emitRuntimeEvent(event);
       },

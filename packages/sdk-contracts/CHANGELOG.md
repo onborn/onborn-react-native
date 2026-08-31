@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0-beta.1
+
+- Artifact delivery may carry the experiment assignment (`experiment` on `BuilderV2UiIrArtifactDeliverySchema`), returned only to clients that ask (`assignment=1`).
+- Synced contracts with the platform: carousel/chart/Lottie nodes, host capabilities, paywall placements, instrumentation screen shapes.
+
 ## 0.2.0-beta.1
 
 - **Breaking:** `BaseEventSchema` requires `flowName` (1–60 chars) on every analytics event.

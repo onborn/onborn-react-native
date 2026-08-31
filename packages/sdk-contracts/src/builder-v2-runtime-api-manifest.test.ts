@@ -8,6 +8,8 @@ test("runtime API manifest documents every supported capability group", () => {
     "interactions",
     "localization",
     "billing",
+    "links",
+    "auth",
     "camera",
     "haptics",
     "notifications",
@@ -17,8 +19,15 @@ test("runtime API manifest documents every supported capability group", () => {
     Object.keys(BUILDER_V2_RUNTIME_API_MANIFEST.groups.navigation.methods),
     ["continue", "back", "complete", "dismiss"],
   );
+  /*
+   * Not the optional-chained device signature this used to assert. Billing is
+   * always there on the authoring side, and it is bought by plan — the optional
+   * form pushed screens into `billing?.hasPlan(0)`, which the artifact compiler
+   * rejects.
+   */
+  assert.equal(BUILDER_V2_RUNTIME_API_MANIFEST.groups.billing.required, true);
   assert.match(
     BUILDER_V2_RUNTIME_API_MANIFEST.groups.billing.methods.purchase.signature,
-    /runtime\.billing\?\.purchase/,
+    /runtime\.billing\.purchase\(plan\)/,
   );
 });

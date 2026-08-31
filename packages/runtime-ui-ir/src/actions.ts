@@ -1,4 +1,5 @@
 export * from "./application/create-ui-ir-action-handler";
+export * from "./domain/ui-ir-answers";
 export * from "./domain/ui-ir-journey";
 export * from "./ports/ui-ir-action-runtime";
 export type {

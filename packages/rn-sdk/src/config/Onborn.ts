@@ -37,6 +37,20 @@ export const Onborn = {
     });
   },
 
+  /*
+   * Spreading AnalyticsOnborn brings initAsync along, but that one resolves the
+   * anonymous id against the storage in the config it is handed — and this
+   * package removes analyticsStorage from the public config. Without this
+   * override the persisted-id path silently became the in-memory one: a new
+   * user on every cold start, and an experiment re-rolling its arm each launch.
+   */
+  async initAsync(config: OnbornConfig): Promise<void> {
+    await AnalyticsOnborn.initAsync({
+      ...config,
+      analyticsStorage: defaultAnalyticsStorage,
+    });
+  },
+
   getConfig(): OnbornConfig | null {
     const config = AnalyticsOnborn.getConfig();
     if (!config) {

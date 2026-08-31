@@ -1,4 +1,3 @@
-import type { PaywallConfig } from "@onborn/sdk-contracts";
 import type { BillingClient } from "./client";
 import type {
   OnbornPackageWithProduct,
@@ -14,7 +13,9 @@ export type BillingValidationClient = Pick<
 
 type ValidateBillingPurchaseInput = {
   client: BillingValidationClient;
-  paywall?: PaywallConfig;
+  paywallId?: string;
+  /** The flow the paywall screen belongs to, for revenue attribution. */
+  flowId?: string;
   offering: BillingOffering;
   item: OnbornPackageWithProduct;
   result: OnbornPurchaseResult;
@@ -38,7 +39,8 @@ export async function validateBillingPurchase(
 
   const response = await input.client.validatePurchase({
     idempotencyKey: createPurchaseIdempotencyKey(input),
-    paywallId: input.paywall?.id,
+    paywallId: input.paywallId,
+    flowId: input.flowId,
     offeringId: input.offering.id,
     packageId: input.item.package.id,
     productId: product.id,

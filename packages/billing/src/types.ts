@@ -4,11 +4,8 @@ import type {
   BillingPackage,
   BillingProduct,
   CustomerEntitlement,
-  GetFlowResponse,
   GetOfferingResponse,
-  GetPaywallResponse,
   NativeStoreRestoredPurchase,
-  PaywallConfig,
   PurchaseStatus,
 } from "@onborn/sdk-contracts";
 
@@ -20,7 +17,8 @@ export type OnbornPackageWithProduct = {
 };
 
 export type OnbornPurchaseInput = {
-  paywall?: PaywallConfig;
+  /** The paywall screen the purchase started from, for attribution. */
+  paywallId?: string;
   offering: BillingOffering;
   package: BillingPackage;
   product?: BillingProduct;
@@ -43,14 +41,14 @@ export type OnbornPurchaseResult = {
 };
 
 export type OnbornRestoreInput = {
-  paywall?: PaywallConfig;
+  paywallId?: string;
   offering?: BillingOffering;
   products: BillingProduct[];
   userId?: string;
 };
 
 export type OnbornLoadProductsInput = {
-  paywall?: PaywallConfig;
+  paywallId?: string;
   offering?: BillingOffering;
   products: BillingProduct[];
   userId?: string;
@@ -88,12 +86,11 @@ export type OnbornBillingAdapter = {
 };
 
 export type OnbornPaywallRuntimeContext = {
-  paywall?: PaywallConfig;
+  paywallId?: string;
   offering?: BillingOffering;
   products?: BillingProduct[];
   platform?: BillingPlatform;
   presentationMode?: "standalone" | "flow";
-  experiment?: NonNullable<GetFlowResponse["experiment"]>;
   selectedPackageId?: string;
   onSelectPackage?: (packageId: string) => void;
   onPurchaseSelectedPackage?: () => void;
@@ -104,5 +101,4 @@ export type OnbornPaywallRuntimeContext = {
   restoring?: boolean;
 };
 
-export type OnbornPaywallData = GetPaywallResponse;
 export type OnbornOfferingData = GetOfferingResponse;

@@ -1,6 +1,6 @@
 {
   "name": "@onborn/sdk-contracts",
-  "version": "0.6.2-beta.1",
+  "version": "0.7.0-beta.1",
   "description": "Runtime-safe contracts used by Onborn client SDKs.",
   "license": "UNLICENSED",
   "repository": {
@@ -100,6 +100,10 @@
     "./analytics": {
       "types": "./dist/analytics.d.ts",
       "default": "./dist/analytics.js"
+    },
+    "./builder-v2-ui-ir-web-target": {
+      "types": "./dist/builder-v2-ui-ir-web-target.d.ts",
+      "default": "./dist/builder-v2-ui-ir-web-target.js"
     }
   },
   "files": [

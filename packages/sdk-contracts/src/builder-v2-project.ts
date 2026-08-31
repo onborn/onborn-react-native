@@ -72,22 +72,138 @@ export const BuilderV2ProjectLegalSchema = z
  * environment's current offering, which is what every existing flow gets, so
  * adding this changes nothing until someone chooses.
  */
-export const BuilderV2ProjectScreenPaywallSchema = z
+/**
+ * A plan the screen was designed around, for the canvas to draw.
+ *
+ * Not a price the flow charges and not a product it sells: the artifact binds
+ * plans by position and the device fills them from the live offering. This is
+ * what the canvas shows while there is nothing to fill them from — the shape
+ * the paywall was composed for, taken from the reference it was built against.
+ *
+ * It exists because the alternative was worse in both directions. With no
+ * offering the canvas fell back to two generic samples, so a screen designed
+ * around three tiers was reviewed as two. With a half-configured offering it
+ * drew an em dash where each price belongs, and the visual review spent three
+ * rounds asking for prices the source could not supply.
+ */
+/*
+ * The optional fields take null as well as absence. A plan wrote
+ * "badge": null for the row that has no badge — the natural way to say it in
+ * JSON — and the whole specification was refused, costing a repair round that
+ * could only delete the word.
+ */
+const optionalSampleText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .nullish()
+    .transform((value) => value ?? undefined);
+
+export const BuilderV2ProjectScreenPlanSampleSchema = z
   .object({
-    offeringKey: z.string().trim().min(1).max(160).optional(),
+    title: z.string().trim().min(1).max(80),
+    price: z.string().trim().min(1).max(40),
+    period: optionalSampleText(40),
+    trial: optionalSampleText(60),
+    badge: optionalSampleText(40),
+    description: optionalSampleText(160),
   })
   .strict();
+
+export const BuilderV2ProjectScreenPaywallSchema = z
+  .object({
+    /*
+     * An empty string means the same as absent. The planner is told to name
+     * a key only when the request asks for one, and "" is the natural way a
+     * model says "none" in a required-feeling field — a live run burned a
+     * repair round on min(1) for exactly that.
+     */
+    offeringKey: z
+      .string()
+      .trim()
+      .max(160)
+      .optional()
+      .transform((value) => (value ? value : undefined)),
+    /**
+     * What the canvas draws until a real offering answers.
+     *
+     * Ordered as the screen lays them out, so plan(0) is the first of these.
+     * Replaced entirely once products are attached: the design survives, the
+     * numbers come from the store.
+     */
+    samplePlans: z
+      .array(BuilderV2ProjectScreenPlanSampleSchema)
+      .max(6)
+      .optional(),
+  })
+  .strict();
+
+/**
+ * Where a screen exists: the app journey, the web funnel, or (absent) both.
+ *
+ * One flow ships to two surfaces from one artifact, and most screens belong
+ * to both — so absence means both, and the flag only ever narrows. "Skip the
+ * welcome on web" (the ad already did its job) is `["app"]`; an extra quiz
+ * question the funnel wants is `["web"]`. Named `channels` to match the
+ * analytics dimension, and because `surface` already means
+ * onboarding-vs-paywall here.
+ */
+export const BuilderV2ProjectChannelSchema = z.enum(["app", "web"]);
 
 export const BuilderV2ProjectScreenSchema = z
   .object({
     screenId: ProjectIdSchema,
     file: SourcePathSchema,
     surface: BuilderV2ProjectSurfaceSchema,
+    channels: z
+      .array(BuilderV2ProjectChannelSchema)
+      .min(1)
+      .max(2)
+      .optional()
+      /* Both named is the same as absent; keep the document canonical. */
+      .transform((value) =>
+        value && new Set(value).size === 2 ? undefined : value,
+      ),
     placement: BuilderV2PaywallPlacementSchema.optional(),
+    /**
+     * A paywall the app shows on its own, outside the journey.
+     *
+     * The journey is a sequence someone walks once; a standalone paywall is
+     * presented by the app at a moment of its own choosing — a locked feature,
+     * a settings upsell, a win-back — and has no next screen and no position.
+     * It ships in the same release as the flow it belongs to and is reached by
+     * its placement, which is why one is required.
+     */
+    /*
+     * `false` is accepted and means the same as absent. A plan wrote
+     * "standalone": false for its ordinary paywall — the natural thing to write
+     * — and the whole specification was refused over it, costing a repair round
+     * that could only ever delete the word.
+     */
+    standalone: z
+      .boolean()
+      .optional()
+      .transform((value) => (value === true ? (true as const) : undefined)),
     paywall: BuilderV2ProjectScreenPaywallSchema.optional(),
   })
   .strict()
   .superRefine((screen, context) => {
+    if (screen.standalone && screen.surface !== "paywall") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Only paywall screens can be standalone",
+        path: ["standalone"],
+      });
+    }
+    if (screen.standalone && !screen.placement) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "A standalone paywall needs a placement: the app has no other way to ask for it",
+        path: ["placement"],
+      });
+    }
     if (screen.paywall && screen.surface !== "paywall") {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -178,6 +294,29 @@ export const BuilderV2ProjectManifestSchema = z
     assets: z.array(BuilderV2ProjectAssetSchema).max(1_000).optional(),
     screens: z.array(BuilderV2ProjectScreenSchema).min(1).max(1_000),
     legal: BuilderV2ProjectLegalSchema.optional(),
+    /**
+     * The product this flow is being built as, when there is one.
+     *
+     * Written by promotion when a run recreated a named product from
+     * references verified against the library's own record. Read by every
+     * later run on the flow, so "Now create a paywall" after "Create a Wispr
+     * Flow welcome" searches for the Wispr Flow paywall and recreates it —
+     * instead of composing a generic one in the project's colours, which is
+     * what happened when the only memory of the product was the first prompt.
+     *
+     * In the manifest rather than anywhere hidden: it is visible on the
+     * project card, versioned with the revision, removed with one edit, and
+     * scoped to this flow. A request to redesign as another product rewrites
+     * it.
+     */
+    recreates: z
+      .object({
+        product: z.string().trim().min(1).max(80),
+        /** The run that last verified it, for provenance. */
+        runId: z.string().trim().min(1).max(80).optional(),
+      })
+      .strict()
+      .optional(),
     localization: BuilderV2ProjectLocalizationSchema.optional(),
     capabilities: z
       .array(BuilderV2NativeCapabilityRegistrationSchema)
@@ -227,6 +366,26 @@ export const BuilderV2ProjectManifestSchema = z
         code: z.ZodIssueCode.custom,
         message: "entryScreenId must reference a declared screen",
         path: ["entryScreenId"],
+      });
+    }
+    if (
+      manifest.screens.some(
+        (screen) =>
+          screen.standalone && screen.screenId === manifest.entryScreenId,
+      )
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "entryScreenId cannot be a standalone paywall: the journey has to start on a screen it walks",
+        path: ["entryScreenId"],
+      });
+    }
+    if (manifest.screens.every((screen) => screen.standalone)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "A project needs at least one screen in its journey",
+        path: ["screens"],
       });
     }
 

@@ -15,6 +15,7 @@ export type ExpoUiIrFlowProps = {
 export function ExpoUiIrFlow(props: ExpoUiIrFlowProps): ReactElement {
   return (
     <UiIrJourney
+      answers={props.session.answers}
       document={props.session.document}
       locale={props.locale}
       controller={props.session.controller}

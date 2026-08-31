@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -8,6 +9,7 @@ import {
 
 import type { BuilderV2UiIrScreen } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
+import type { UiIrAnswerStore } from "../domain/ui-ir-answers";
 import {
   initialUiIrStateValues,
   type UiIrStateValues,
@@ -32,10 +34,20 @@ const UiIrScreenStateContext = createContext<UiIrScreenStateValue>({
 export function UiIrScreenStateProvider(props: {
   screen: Pick<BuilderV2UiIrScreen, "screenId" | "state">;
   children: ReactNode;
+  /**
+   * Where this screen's selections are published for the journey to report as
+   * the screen's answer. Absent when nobody is listening, which is every
+   * render path that is not a live session (previews, tests).
+   */
+  answers?: UiIrAnswerStore;
 }) {
   const [values, setValues] = useState<UiIrStateValues>(() =>
     initialUiIrStateValues(props.screen),
   );
+  const { answers, screen } = props;
+  useEffect(() => {
+    answers?.record(screen.screenId, values);
+  }, [answers, screen.screenId, values]);
   const value = useMemo<UiIrScreenStateValue>(
     () => ({
       values,

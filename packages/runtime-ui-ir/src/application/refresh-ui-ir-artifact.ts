@@ -25,6 +25,13 @@ export type RefreshUiIrArtifactResult = {
   artifact: CachedUiIrArtifact;
   source: "network" | "last-known-good" | "cache-current";
   failureCode?: UiIrArtifactFailureCode;
+  /**
+   * The experiment assignment the delivery named for this person. Present on
+   * the network paths (the server just said it); absent on last-known-good —
+   * an offline runtime does not guess which arm it is on, and untagged
+   * events simply stay out of the experiment's readout.
+   */
+  experiment?: BuilderV2UiIrArtifactDelivery["experiment"];
 };
 
 export async function refreshUiIrArtifact(
@@ -70,12 +77,17 @@ export async function refreshUiIrArtifact(
         delivery.artifact.manifest.artifactId &&
       (await cachedArtifactReadsBack(lastKnownGood, dependencies))
     ) {
-      return { artifact: lastKnownGood, source: "cache-current" };
+      return {
+        artifact: lastKnownGood,
+        source: "cache-current",
+        ...(delivery.experiment ? { experiment: delivery.experiment } : {}),
+      };
     }
     stageId = await stageDelivery(delivery, scope, dependencies);
     return {
       artifact: await dependencies.cache.activateStage(stageId),
       source: "network",
+      ...(delivery.experiment ? { experiment: delivery.experiment } : {}),
     };
   } catch (error) {
     if (stageId) {

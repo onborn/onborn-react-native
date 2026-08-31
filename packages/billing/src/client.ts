@@ -7,11 +7,9 @@ import { resolveOnbornBillingConfig } from "./runtime";
 import {
   CustomerEntitlementsResponseSchema,
   GetOfferingResponseSchema,
-  GetPaywallResponseSchema,
   PurchaseValidationResponseSchema,
   type CustomerEntitlementsResponse,
   type GetOfferingResponse,
-  type GetPaywallResponse,
   type PurchaseValidationResponse,
   type RestorePurchasesRequest,
   type ValidatePurchaseRequest,
@@ -47,25 +45,15 @@ export class BillingClient {
   private readonly userId: string;
   private readonly fetchImpl: typeof fetch;
   private readonly emitAnalyticsEvents: boolean;
-
-  private loadedPaywallName: string | null = null;
+  /** Honors the shared config's apiBaseUrl, like the analytics client. */
+  private readonly apiBaseUrl: string;
 
   constructor(private readonly options: BillingClientOptions = {}) {
     this.config = resolveOnbornBillingConfig();
     this.userId = this.config.userId ?? createAnonymousUserId();
     this.fetchImpl = this.config.fetchImpl ?? fetch;
     this.emitAnalyticsEvents = this.config.emitAnalyticsEvents !== false;
-  }
-
-  async loadPaywall(paywallId: string): Promise<GetPaywallResponse> {
-    const url = this.runtimeUrl(`/paywalls/${encodeURIComponent(paywallId)}`);
-    const payload = await this.getJson(url, `paywall '${paywallId}'`);
-    const parsed = GetPaywallResponseSchema.safeParse(payload);
-    if (!parsed.success) {
-      throw new Error("Invalid paywall response payload");
-    }
-    this.loadedPaywallName = parsed.data.paywall.name?.trim() || null;
-    return parsed.data;
+    this.apiBaseUrl = this.config.apiBaseUrl ?? ONBORN_API_BASE_URL;
   }
 
   /**
@@ -111,8 +99,51 @@ export class BillingClient {
     });
   }
 
+  /**
+   * Redeems a web-purchase claim for this device's identity.
+   *
+   * The claim arrives as the magic-link token or the typed code from the
+   * checkout email — one method takes either. On success the backend links
+   * this userId to the web purchaser's identity, and every entitlement read
+   * from then on sees the web subscription; the returned entitlements are
+   * the fresh, post-link read.
+   */
+  async redeemEntitlementClaim(
+    claim: string,
+  ): Promise<CustomerEntitlementsResponse & { linkedUserId: string }> {
+    const url = new URL(`${this.apiBaseUrl}/entitlements/claims/redeem`);
+    const response = await this.fetchImpl(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.config.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ claim, userId: this.userId }),
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      linkedUserId?: unknown;
+      entitlements?: unknown;
+      error?: unknown;
+      code?: unknown;
+    } | null;
+    if (!response.ok) {
+      throw new OnbornBillingRequestError(
+        typeof payload?.error === "string"
+          ? payload.error
+          : "Claim redemption failed",
+        response.status,
+        typeof payload?.code === "string" ? payload.code : undefined,
+      );
+    }
+    const parsed = CustomerEntitlementsResponseSchema.safeParse(payload);
+    if (!parsed.success || typeof payload?.linkedUserId !== "string") {
+      throw new Error("Invalid claim redemption response payload");
+    }
+    return { ...parsed.data, linkedUserId: payload.linkedUserId };
+  }
+
   async loadCustomerEntitlements(): Promise<CustomerEntitlementsResponse> {
-    const url = new URL(`${ONBORN_API_BASE_URL}/entitlements`);
+    const url = new URL(`${this.apiBaseUrl}/entitlements`);
     url.searchParams.set("userId", this.userId);
     const payload = await this.getJson(url, "customer entitlements");
     const parsed = CustomerEntitlementsResponseSchema.safeParse(payload);
@@ -176,7 +207,7 @@ export class BillingClient {
   }
 
   private runtimeUrl(path: string): URL {
-    const url = new URL(`${ONBORN_API_BASE_URL}${path}`);
+    const url = new URL(`${this.apiBaseUrl}${path}`);
     appendParam(url, "userId", this.userId);
     appendParam(url, "locale", this.config.locale);
     appendParam(url, "platform", this.config.platform);
@@ -200,7 +231,7 @@ export class BillingClient {
     path: "/purchases/validate" | "/purchases/restore",
     payload: ValidatePurchaseRequest | RestorePurchasesRequest,
   ): Promise<PurchaseValidationResponse> {
-    const response = await this.fetchImpl(`${ONBORN_API_BASE_URL}${path}`, {
+    const response = await this.fetchImpl(`${this.apiBaseUrl}${path}`, {
       method: "POST",
       headers: {
         ...this.authorizationHeaders(),
@@ -236,9 +267,7 @@ export class BillingClient {
     await Onborn.track({
       ...input,
       flowId: this.options.sourceId ?? "billing",
-      // Paywall events name themselves from the paywall they were loaded for,
-      // so billing works without the host app configuring anything.
-      flowName: this.loadedPaywallName ?? this.options.paywallName ?? "Paywall",
+      flowName: this.options.paywallName ?? "Paywall",
       userId: this.userId,
     } as TrackEventInput);
   }

@@ -107,11 +107,11 @@ describe("paywall bindings", () => {
   });
 });
 
-describe("one offering per flow", () => {
-  it("refuses a document whose paywalls name different offerings", () => {
+describe("one offering per presentation", () => {
+  it("refuses a journey whose paywalls name different offerings", () => {
     /*
-     * The host loads one offering before anything renders, so two paywalls
-     * naming different ones cannot both be right — one would sell the other's
+     * The host loads one offering before anything renders, so two paywalls in
+     * the same presentation cannot both be right — one would sell the other's
      * plans at the other's prices, and nobody would see it until a charge.
      */
     const result = BuilderV2UiIrDocumentSchema.safeParse(
@@ -121,7 +121,7 @@ describe("one offering per flow", () => {
     assert.equal(result.success, false);
     assert.match(
       result.success ? "" : result.error.issues[0]!.message,
-      /A flow sells one offering/,
+      /A journey sells one offering/,
     );
   });
 
@@ -131,6 +131,26 @@ describe("one offering per flow", () => {
         .success,
       true,
     );
+  });
+
+  /*
+   * A standalone paywall is opened by the app on its own, so it loads its own
+   * offering when it opens. That is the whole point of the exception: a
+   * win-back screen sells a discounted offering without the onboarding's
+   * paywall changing what it charges.
+   */
+  it("lets a standalone paywall sell an offering of its own", () => {
+    const document = uiIrDocument(["launch", "winback"]);
+    const result = BuilderV2UiIrDocumentSchema.safeParse({
+      ...document,
+      screens: document.screens.map((screen, index) =>
+        index === 1
+          ? { ...screen, standalone: true, placement: "winback" }
+          : screen,
+      ),
+    });
+
+    assert.equal(result.success, true);
   });
 });
 

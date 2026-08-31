@@ -19,10 +19,14 @@ export function createBuilderV2BillingPort(
   readOffering: () => OfferingActions,
 ): ExpoUiIrBillingPort {
   return {
-    async purchase({ packageId }) {
+    async purchase({ packageId, screenId }) {
       try {
         return mapPurchaseResult(
-          await readOffering().purchasePackage(packageId),
+          // The paywall a purchase is attributed to is the screen it was
+          // bought on, which is the same id its paywall_* events carry.
+          await readOffering().purchasePackage(packageId, {
+            paywallId: screenId,
+          }),
         );
       } catch (error) {
         if (isUserCancelledError(error)) return { status: "cancelled" };

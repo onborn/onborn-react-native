@@ -4,6 +4,7 @@ export const BUILDER_V2_EXPO_CAPABILITY_CONFIG_KEY =
   "onbornRuntimeCapabilities" as const;
 
 export const BuilderV2NativeCapabilityNameSchema = z.enum([
+  "auth",
   "billing",
   "camera",
   "haptics",

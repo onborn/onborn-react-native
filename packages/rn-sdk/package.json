@@ -1,6 +1,6 @@
 {
   "name": "@onborn/rn-sdk",
-  "version": "0.6.3-beta.1",
+  "version": "0.7.0-beta.1",
   "description": "React Native SDK for rendering Onborn onboarding flows and paywalls.",
   "license": "UNLICENSED",
   "repository": {
@@ -22,11 +22,6 @@
       "types": "./dist/index.d.ts",
       "react-native": "./dist/index.js",
       "default": "./dist/index.js"
-    },
-    "./internal": {
-      "types": "./dist/internal.d.ts",
-      "react-native": "./dist/internal.js",
-      "default": "./dist/internal.js"
     }
   },
   "files": [
@@ -36,19 +31,7 @@
     "dist/config/**/*.d.ts",
     "dist/builder-v2/**/*.js",
     "dist/builder-v2/**/*.d.ts",
-    "dist/core/**/*.js",
-    "dist/core/**/*.d.ts",
-    "dist/hooks/**/*.js",
-    "dist/hooks/**/*.d.ts",
-    "dist/paywall/**/*.js",
-    "dist/paywall/**/*.d.ts",
-    "dist/renderer/**/*.js",
-    "dist/renderer/**/*.d.ts",
-    "dist/ui/**/*.js",
-    "dist/ui/**/*.d.ts",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE"
+    "README.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -76,11 +59,11 @@
     "@expo-google-fonts/schibsted-grotesk": "^0.4.2",
     "@expo-google-fonts/sora": "^0.4.2",
     "@expo-google-fonts/space-grotesk": "^0.4.1",
-    "@onborn/analytics": "0.6.2-beta.1",
-    "@onborn/billing": "0.5.2-beta.1",
-    "@onborn/runtime-expo-ui-ir": "0.5.3-beta.1",
-    "@onborn/runtime-ui-ir": "0.5.3-beta.1",
-    "@onborn/sdk-contracts": "0.6.2-beta.1",
+    "@onborn/analytics": "0.7.0-beta.1",
+    "@onborn/billing": "0.6.0-beta.1",
+    "@onborn/runtime-expo-ui-ir": "0.6.0-beta.1",
+    "@onborn/runtime-ui-ir": "0.6.0-beta.1",
+    "@onborn/sdk-contracts": "0.7.0-beta.1",
     "@react-native-async-storage/async-storage": "^3.0.3",
     "@tamagui/config": "^2.0.0-rc.42",
     "@tamagui/core": "^2.0.0-rc.42",

@@ -1,4 +1,3 @@
-export * from "./config/cache";
 export * from "./config/analyticsStorage";
 export {
   Onborn,
@@ -6,29 +5,17 @@ export {
   useOnbornRuntimeConfig,
   type OnbornConfig,
 } from "./config/Onborn";
-export * from "./config/templates";
+export { OnbornFlow, type OnbornFlowProps } from "./builder-v2/OnbornFlow";
+// The journey a person walks once, and a paywall the app presents wherever it
+// decides. Both come from the same published release.
 export {
-  OnbornFlow,
-  type OnbornFlowProps,
-} from "./builder-v2/OnbornFlow";
-export * from "./hooks/useSubscriptionFlow";
-export * from "./paywall";
-export {
-  SubscriptionPaywall,
-  SubscriptionFlow,
-  type InitialLoadingComponentProps,
-  type NativeCustomStepPrimitiveHelpers,
-  type NativeCustomStepPrimitiveInput,
-  type NativeCustomStepRenderActions,
-  type NativeCustomStepRenderer,
-  type NativeCustomStepRendererProps,
-  type NativeCustomStepRenderers,
-  type SubscriptionPaywallProps,
-  type SubscriptionFlowProps,
-} from "./renderer/SubscriptionFlow";
-export {
-  createStepTransitionAnimations,
-  STEP_TRANSITION_MS,
-  STEP_TRANSITION_EASE_OUT,
-} from "./renderer/step-transitions";
-export * from "./ui";
+  OnbornPaywall,
+  type OnbornPaywallProps,
+} from "./builder-v2/OnbornPaywall";
+// An app lends native capabilities through this type; without it exported the
+// prop could be passed but never typed.
+export type { OnbornHostCapabilities } from "./builder-v2/host-capabilities";
+export type {
+  BuilderV2RuntimeLottie,
+  BuilderV2RuntimeLottieView,
+} from "./builder-v2/lottie-capability";

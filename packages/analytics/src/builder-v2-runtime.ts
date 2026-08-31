@@ -93,6 +93,10 @@ export class BuilderV2RuntimeEventMapper {
               ),
               timestamp,
             ),
+            // The screen's selections are this step's answer. Reported under
+            // the field the dashboard already reads, so answer distribution and
+            // experiment answer breakdowns work without a second pipeline.
+            ...(action.answers ? { answer: action.answers } : {}),
           },
           timestamp,
         );

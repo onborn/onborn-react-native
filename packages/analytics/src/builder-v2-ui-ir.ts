@@ -5,6 +5,7 @@ import {
   type BuilderV2UiIrDocument,
   type BuilderV2UiIrJsonValue,
   type BuilderV2UiIrRelease,
+  type RuntimeExperimentAssignment,
 } from "@onborn/sdk-contracts";
 import {
   interactionKey,
@@ -16,11 +17,19 @@ import {
 export type BuilderV2UiIrAnalyticsInput = {
   flowId: string;
   environment: "test" | "prod";
-  target: "ios" | "android";
+  /** Who is reporting: the app targets, or the web funnel host. */
+  target: "ios" | "android" | "web";
   artifact: BuilderV2SignedUiIrArtifact;
   release: BuilderV2UiIrRelease;
   document: BuilderV2UiIrDocument;
   sessionId: string;
+  /**
+   * The experiment assignment this session was served under, when a running
+   * experiment named one at artifact delivery. Stamped on every event the
+   * bridge emits — the stamp is the whole measurement loop of an experiment:
+   * without it results have assignments but no behaviour to count.
+   */
+  experiment?: RuntimeExperimentAssignment;
   emit(event: BuilderV2RuntimeEvent): void | Promise<void>;
   now?: () => Date;
 };
@@ -41,31 +50,47 @@ export function createBuilderV2UiIrAnalyticsBridge(
 ): BuilderV2UiIrAnalyticsBridge {
   const runtime = readSignedUiIrAnalyticsContext(input);
 
+  const emitRuntimeEvent = async (
+    action: BuilderV2RuntimeEvent["action"],
+  ): Promise<void> => {
+    const runtimeEvent = BuilderV2RuntimeEventSchema.parse({
+      schemaVersion: 1,
+      action,
+      flowId: input.flowId,
+      flowName: runtime.flowName,
+      sessionId: input.sessionId,
+      environment: input.environment,
+      target: input.target,
+      runtimeVersion: input.artifact.manifest.runtimeVersion,
+      artifactId: input.artifact.manifest.artifactId,
+      releaseId: input.release.releaseId,
+      ...(input.experiment ? { experiment: input.experiment } : {}),
+      occurredAt: (input.now?.() ?? new Date()).toISOString(),
+      ...("screenId" in action
+        ? { screenContext: screenContextOf(runtime.screens, action.screenId) }
+        : {}),
+    });
+    await input.emit(runtimeEvent);
+  };
+
+  /*
+   * Exposure is the moment a person actually enters the assigned journey —
+   * not the artifact fetch, which can happen on a cold start that never
+   * shows a screen. Emitted once, alongside the journey's own start event.
+   */
+  let exposureReported = false;
+
   return {
     async track(event) {
-      const action = mapRuntimeAction(event, runtime);
-      const runtimeEvent = BuilderV2RuntimeEventSchema.parse({
-        schemaVersion: 1,
-        action,
-        flowId: input.flowId,
-        flowName: runtime.flowName,
-        sessionId: input.sessionId,
-        environment: input.environment,
-        target: input.target,
-        runtimeVersion: input.artifact.manifest.runtimeVersion,
-        artifactId: input.artifact.manifest.artifactId,
-        releaseId: input.release.releaseId,
-        occurredAt: (input.now?.() ?? new Date()).toISOString(),
-        ...("screenId" in action
-          ? {
-              screenContext: requiredScreen(
-                runtime.screens,
-                action.screenId,
-              ),
-            }
-          : {}),
-      });
-      await input.emit(runtimeEvent);
+      if (
+        input.experiment &&
+        !exposureReported &&
+        event.event === "journey.started"
+      ) {
+        exposureReported = true;
+        await emitRuntimeEvent({ type: "experiment_exposed" });
+      }
+      await emitRuntimeEvent(mapRuntimeAction(event, runtime));
     },
   };
 }
@@ -85,7 +110,10 @@ function mapRuntimeAction(
     case "screen.viewed":
       return screenAction("screen_viewed", event, screens);
     case "screen.completed":
-      return screenAction("screen_completed", event, screens);
+      return {
+        ...screenAction("screen_completed", event, screens),
+        ...readSignedAnswers(event, screens),
+      };
     case "screen.returned":
       return screenAction("screen_returned", event, screens);
     case "paywall.viewed":
@@ -125,6 +153,32 @@ function mapRuntimeAction(
     default:
       return customAction(event, screens, nodes);
   }
+}
+
+/**
+ * The screen's selections, kept only where the signed document says they can
+ * exist. An answer naming a state the screen never declared, or a value none of
+ * its actions can set, is dropped rather than reported: analytics that accepts
+ * whatever the client sends is analytics anybody can forge.
+ */
+function readSignedAnswers(
+  event: BuilderV2UiIrAnalyticsEvent,
+  screens: Map<string, SignedScreenContext>,
+): { answers?: Record<string, string | null> } {
+  const reported = event.properties?.answers;
+  if (!reported || typeof reported !== "object" || Array.isArray(reported)) {
+    return {};
+  }
+  const screenId = requireScreenId(event, screens);
+  const declared = screens.get(screenId)?.answers;
+  if (!declared) return {};
+  const answers: Record<string, string | null> = {};
+  for (const [name, value] of Object.entries(reported)) {
+    if (value !== null && typeof value !== "string") continue;
+    if (!declared.get(name)?.has(value)) continue;
+    answers[name] = value;
+  }
+  return Object.keys(answers).length > 0 ? { answers } : {};
 }
 
 function screenAction(
@@ -228,6 +282,16 @@ function requireNodeId(
     );
   }
   return event.nodeId;
+}
+
+/** The screen's reportable context. The declared answers stay behind: they
+ * are what the bridge validates against, not something the event carries. */
+function screenContextOf(
+  screens: Map<string, SignedScreenContext>,
+  screenId: string,
+): { position: number; surface: "onboarding" | "paywall" } {
+  const screen = requiredScreen(screens, screenId);
+  return { position: screen.position, surface: screen.surface };
 }
 
 function requiredScreen(

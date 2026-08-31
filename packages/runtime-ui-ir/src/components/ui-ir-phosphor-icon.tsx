@@ -1,23 +1,25 @@
-import type { ComponentType, ReactElement } from "react";
-
-import * as PhosphorIcons from "phosphor-react-native";
-import type { IconProps } from "phosphor-react-native";
+import type { ReactElement } from "react";
 
 import type { BuilderV2UiIrNode } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
+import type { UiIrIconRegistryPort } from "../ports/ui-ir-icon-registry";
+
 type PhosphorIconNode = Extract<BuilderV2UiIrNode, { type: "phosphor-icon" }>;
 
-const iconRegistry = PhosphorIcons as unknown as Readonly<
-  Record<string, ComponentType<IconProps> | undefined>
->;
-
+/*
+ * Icons come from the host's registry rather than a static import of the
+ * whole Phosphor set; see UiIrIconRegistryPort for why. The throw stays: an
+ * icon the artifact names and the host cannot supply is a wiring bug, not a
+ * rendering choice.
+ */
 export function UiIrPhosphorIcon(props: {
   node: PhosphorIconNode;
+  icons: UiIrIconRegistryPort;
 }): ReactElement {
-  const Icon = iconRegistry[props.node.name];
+  const Icon = props.icons.resolve(props.node.name);
   if (!Icon) {
     throw new Error(
-      `UI IR Phosphor icon "${props.node.name}" is unavailable in the runtime.`,
+      `UI IR Phosphor icon "${props.node.name}" is not provided by the host's icon registry.`,
     );
   }
   return (

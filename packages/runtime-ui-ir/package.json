@@ -1,6 +1,6 @@
 {
   "name": "@onborn/runtime-ui-ir",
-  "version": "0.5.3-beta.1",
+  "version": "0.6.0-beta.1",
   "description": "Verified UI IR runtime used by Onborn client SDKs.",
   "license": "UNLICENSED",
   "private": false,
@@ -28,6 +28,11 @@
       "types": "./dist/react.d.ts",
       "react-native": "./dist/react.js",
       "default": "./dist/react.js"
+    },
+    "./phosphor": {
+      "types": "./dist/phosphor.d.ts",
+      "react-native": "./dist/phosphor.js",
+      "default": "./dist/phosphor.js"
     }
   },
   "files": [
@@ -50,7 +55,7 @@
   "dependencies": {
     "@noble/ed25519": "3.1.0",
     "@noble/hashes": "2.2.0",
-    "@onborn/sdk-contracts": "0.6.2-beta.1",
+    "@onborn/sdk-contracts": "0.7.0-beta.1",
     "phosphor-react-native": "3.0.6"
   },
   "peerDependencies": {

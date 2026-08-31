@@ -70,11 +70,14 @@ export const BUILDER_V2_RUNTIME_API_MANIFEST = {
           description:
             "Record a declared interaction without wrapping a handler.",
         },
-        wrap: {
-          signature:
-            "runtime.interactions.wrap(interactionId: string, handler: Function): Function",
-          description: "Wrap a handler with automatic interaction analytics.",
-        },
+        /*
+         * Removed rather than described: a handler is one call in the dialect,
+         * and a wrapped one cannot be published — the compiler answers
+         * `runtime.interactions.wrap is not a supported semantic host action`.
+         * Offering it here invited screens to write exactly that, which is the
+         * shape this audit was looking for: a documented call that no screen
+         * can ship. `trigger` records the same event and does compile.
+         */
       },
     },
     localization: {
@@ -92,34 +95,68 @@ export const BUILDER_V2_RUNTIME_API_MANIFEST = {
         },
       },
     },
+    /**
+     * Always available, and read by binding rather than by call.
+     *
+     * Listed as optional it read as a native capability a project had to
+     * declare, and a run asked to build a paywall for a project that declared
+     * none concluded the runtime had no billing and asked the user for "the
+     * callback names and product identifiers" — for an API that is ours.
+     */
     billing: {
-      required: false,
+      required: true,
       methods: {
-        getSnapshot: {
+        plan: {
           signature:
-            "runtime.billing?.getSnapshot(): BuilderV2RuntimeBillingSnapshot",
+            "runtime.billing.plan(index: number): { id; title; description; badge; price; period; trial }",
           description:
-            "Read packages, selection, availability, and operation state.",
+            "One plan of the loaded offering by position. Read its fields into text; never write a price, a period or a plan name as copy.",
         },
-        subscribe: {
-          signature:
-            "runtime.billing?.subscribe(listener: () => void): () => void",
+        hasPlan: {
+          signature: "runtime.billing.hasPlan(index: number): boolean",
           description:
-            "Observe billing state and return an unsubscribe function.",
-        },
-        reload: {
-          signature: "runtime.billing?.reload(): Promise<void>",
-          description: "Reload the current offering and product state.",
+            "Whether the offering contains that plan. Wrap a plan block in it so a layout built for two survives an offering that sells one.",
         },
         purchase: {
           signature:
-            "runtime.billing?.purchase(packageId: string): Promise<BuilderV2RuntimePurchaseResult>",
-          description: "Purchase one package selected by its package ID.",
+            "runtime.billing.purchase(plan): Promise<BuilderV2RuntimePurchaseResult>",
+          description:
+            "Buy the plan the screen selected, by plan or by its position. The only action that charges.",
         },
         restore: {
           signature:
-            "runtime.billing?.restore(): Promise<BuilderV2RuntimeRestoreResult>",
-          description: "Restore purchases for the current app user.",
+            "runtime.billing.restore(): Promise<BuilderV2RuntimeRestoreResult>",
+          description:
+            "Restore purchases for the current app user. Required on every paywall by App Review.",
+        },
+      },
+    },
+    links: {
+      required: true,
+      methods: {
+        openTerms: {
+          signature: "runtime.links.openTerms(): Promise<void>",
+          description:
+            "Open the project's Terms of Service. Required on every paywall by App Review, alongside the privacy policy.",
+        },
+        openPrivacy: {
+          signature: "runtime.links.openPrivacy(): Promise<void>",
+          description:
+            "Open the project's Privacy Policy. The URLs belong to the release, so a screen names the document and never writes a link.",
+        },
+      },
+    },
+    auth: {
+      required: false,
+      methods: {
+        signIn: {
+          signature: "runtime.auth?.signIn(): Promise<void>",
+          description:
+            "Hand the person to the host app's own sign-in. The flow renders one button; the app decides what signing in means.",
+        },
+        signUp: {
+          signature: "runtime.auth?.signUp(): Promise<void>",
+          description: "Hand the person to the host app's own account creation.",
         },
       },
     },

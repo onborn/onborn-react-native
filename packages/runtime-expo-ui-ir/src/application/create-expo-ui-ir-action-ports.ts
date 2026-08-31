@@ -71,6 +71,7 @@ function createBillingActions(
       try {
         const result = await billing.purchase({
           packageId: input.packageId,
+          screenId: input.screenId,
         });
         await track(analytics, {
           event: purchaseEvent(result.status),

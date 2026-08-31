@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BuilderV2ProjectManifestSchema } from "./builder-v2-project";
+import {
+  BuilderV2ProjectManifestSchema,
+  BuilderV2ProjectScreenSchema,
+} from "./builder-v2-project";
 
 test("accepts one flat resource file per declared locale", () => {
   const manifest = BuilderV2ProjectManifestSchema.parse(
@@ -79,3 +82,25 @@ function projectManifest(localization: Record<string, unknown>) {
     localization,
   };
 }
+
+/*
+ * Absence already means both channels, so naming both is noise the document
+ * should not carry two spellings of — and a single channel only ever narrows.
+ */
+test("screen channels canonicalize: both named reads as absent", () => {
+  const parsed = BuilderV2ProjectScreenSchema.parse({
+    screenId: "welcome",
+    file: "screens/WelcomeScreen.tsx",
+    surface: "onboarding",
+    channels: ["app", "web"],
+  });
+  assert.equal(parsed.channels, undefined);
+
+  const narrowed = BuilderV2ProjectScreenSchema.parse({
+    screenId: "welcome",
+    file: "screens/WelcomeScreen.tsx",
+    surface: "onboarding",
+    channels: ["app"],
+  });
+  assert.deepEqual(narrowed.channels, ["app"]);
+});

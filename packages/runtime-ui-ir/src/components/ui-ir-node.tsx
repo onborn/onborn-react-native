@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import {
   Image,
   ImageBackground,
+  Modal,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -15,6 +16,7 @@ import {
 import type {
   BuilderV2UiIrAsset,
   BuilderV2UiIrDocument,
+  BuilderV2UiIrJsonValue,
   BuilderV2UiIrNode,
   BuilderV2UiIrStyle,
 } from "@onborn/sdk-contracts/builder-v2-ui-ir";
@@ -26,6 +28,9 @@ import {
 } from "../ports/ui-ir-renderer";
 import { createUiIrNodeCommonProps } from "./ui-ir-node-props";
 import { UiIrAnimatedView } from "./ui-ir-animated-view";
+import { UiIrCarousel } from "./ui-ir-carousel";
+import { UiIrSegmentedControl } from "./ui-ir-segmented-control";
+import { UiIrChart } from "./ui-ir-chart";
 import { UiIrPhosphorIcon } from "./ui-ir-phosphor-icon";
 import { UiIrPressable } from "./ui-ir-pressable";
 import { UiIrVectorNode } from "./ui-ir-vector-node";
@@ -110,10 +115,18 @@ function renderNodeElement(
     case "view":
     case "safe-area-view":
     case "scroll-view":
+      /*
+       * CSS animations are declarative style — animationName, duration,
+       * iteration count — and Reanimated applies them only on an Animated
+       * component. A node whose style carries one, but which has no
+       * entering or exiting transition, used to render as a plain View and
+       * the animation silently did nothing: a pulsing CTA that did not pulse.
+       */
       if (
         props.node.enterTransition ||
         props.node.exitTransition ||
-        props.node.layoutTransition
+        props.node.layoutTransition ||
+        hasCssAnimation(nodeStyle)
       ) {
         return (
           <UiIrAnimatedView
@@ -187,7 +200,7 @@ function renderNodeElement(
         </UiIrPressable>
       );
     case "phosphor-icon":
-      return <UiIrPhosphorIcon node={props.node} />;
+      return <UiIrPhosphorIcon icons={props.ports.icons} node={props.node} />;
     case "status-bar":
       return <StatusBar barStyle={props.node.barStyle} />;
     case "svg":
@@ -223,12 +236,101 @@ function renderNodeElement(
         </>
       );
     /*
+     * The player is lent by the host, like the camera: a native module the
+     * SDK does not bundle. The node arrives at the same port a host
+     * capability component does, with the animation resolved from the
+     * document so the host renders what it is handed and resolves nothing.
+     */
+    case "lottie":
+      return (
+        <>
+          {props.ports.renderCapability({
+            screenId: props.screenId,
+            nodeId: props.node.id,
+            capability: "lottie",
+            component: "LottieView",
+            props: {
+              animation: resolveLottie(props, props.node.assetId),
+              loop: props.node.loop,
+              ...(props.node.speed !== undefined
+                ? { speed: props.node.speed }
+                : {}),
+              ...(props.node.resizeMode
+                ? { resizeMode: props.node.resizeMode }
+                : {}),
+              ...(nodeStyle
+                ? { style: nodeStyle as BuilderV2UiIrJsonValue }
+                : {}),
+              ...(common.accessibilityLabel
+                ? { accessibilityLabel: common.accessibilityLabel }
+                : {}),
+            },
+          })}
+        </>
+      );
+    /*
      * The subtree is described once and instantiated per plan. Each instance
      * names which plan it is, so a `{ current: true }` binding inside it reads
      * that plan's price rather than the first one's.
      */
     case "billing-plans":
       return <UiIrPlanRepeat {...props} node={props.node} />;
+    /*
+     * Presented above the screen. Presence already decided this node renders
+     * at all, so the platform modal is always visible here — the two would
+     * otherwise be two sources of truth for one thing.
+     */
+    case "chart":
+      return (
+        <UiIrChart
+          accessibilityLabel={common.accessibilityLabel}
+          series={props.node.series}
+          style={nodeStyle as never}
+          variant={props.node.variant}
+        />
+      );
+    /*
+     * The document names the segments and the state; the runtime owns the
+     * pill and its movement, because a slide driven by interaction is motion
+     * the document cannot carry.
+     */
+    case "segmented-control":
+      return (
+        <UiIrSegmentedNode
+          {...props}
+          common={common}
+          node={props.node}
+          nodeStyle={nodeStyle}
+          plans={plans}
+        />
+      );
+    /*
+     * One page per child, paged by the runtime because the page width is the
+     * device's and the document may not read it.
+     */
+    case "carousel":
+      return (
+        <UiIrCarousel
+          accessibilityLabel={common.accessibilityLabel}
+          {...(props.node.autoAdvanceMs === undefined
+            ? {}
+            : { autoAdvanceMs: props.node.autoAdvanceMs })}
+          showsIndicator={props.node.showsIndicator}
+          {...carouselIndicatorProps(props.node.indicator)}
+          style={nodeStyle as never}
+        >
+          {renderChildren(props)}
+        </UiIrCarousel>
+      );
+    case "modal":
+      return (
+        <UiIrModal
+          {...props}
+          node={props.node}
+          common={common}
+          nodeStyle={nodeStyle}
+        />
+      );
   }
 }
 
@@ -253,6 +355,71 @@ function resolveUiIrNodeText(
     : resolveUiIrText(props.document, text, props.locale);
 }
 
+function UiIrSegmentedNode(
+  props: UiIrNodeProps & {
+    node: Extract<BuilderV2UiIrNode, { type: "segmented-control" }>;
+    common: Record<string, unknown>;
+    nodeStyle: BuilderV2UiIrStyle | undefined;
+    plans: { snapshot: UiIrPlanSnapshot; currentIndex: number | null };
+  },
+): ReactElement {
+  const screenState = useUiIrScreenState();
+  const selected = screenState.values[props.node.state] ?? null;
+  return (
+    <UiIrSegmentedControl
+      accessibilityLabel={props.common.accessibilityLabel as string | undefined}
+      labelStyle={asTextStyle(props.node.labelStyle)}
+      onSelect={(value) => screenState.set(props.node.state, value)}
+      pillStyle={asViewStyle(props.node.pillStyle)}
+      segments={props.node.segments.map((segment) => ({
+        value: segment.value,
+        label: resolveUiIrNodeText(props, segment.label, props.plans),
+      }))}
+      selected={selected}
+      selectedLabelStyle={asTextStyle(props.node.selectedLabelStyle)}
+      style={asViewStyle(props.nodeStyle)}
+    />
+  );
+}
+
+function UiIrModal(
+  props: UiIrNodeProps & {
+    node: Extract<BuilderV2UiIrNode, { type: "modal" }>;
+    common: Record<string, unknown>;
+    nodeStyle: BuilderV2UiIrStyle | undefined;
+  },
+): ReactElement {
+  const screenState = useUiIrScreenState();
+  const { dismiss } = props.node;
+  return (
+    <Modal
+      {...props.common}
+      animationType="slide"
+      /*
+       * A selection never leaves the device, so the Pressable settles
+       * `state.set` itself and the action handler has no case for it. The
+       * dismissal of a sheet is almost always exactly that, and routing it to
+       * the handler would have closed nothing at all.
+       */
+      onRequestClose={() => {
+        if (dismiss.type === "state.set") {
+          screenState.set(dismiss.state, dismiss.value);
+          return;
+        }
+        void props.ports.handleAction({
+          screenId: props.screenId,
+          nodeId: props.node.id,
+          action: dismiss,
+        });
+      }}
+      transparent
+      visible
+    >
+      <View style={asViewStyle(props.nodeStyle)}>{renderChildren(props)}</View>
+    </Modal>
+  );
+}
+
 function UiIrPlanRepeat(
   props: UiIrNodeProps & {
     node: Extract<BuilderV2UiIrNode, { type: "billing-plans" }>;
@@ -273,6 +440,43 @@ function UiIrPlanRepeat(
   );
 }
 
+/*
+ * The artifact stores the indicator as one object; the component takes the
+ * flat props a screen writes in JSX, so both paths render the same dots.
+ */
+function carouselIndicatorProps(
+  indicator:
+    | {
+        size?: number;
+        spacing?: number;
+        color?: string;
+        activeColor?: string;
+        activeWidth?: number;
+        placement?: "top" | "bottom";
+      }
+    | undefined,
+) {
+  if (!indicator) return {};
+  return {
+    ...(indicator.size === undefined ? {} : { indicatorSize: indicator.size }),
+    ...(indicator.spacing === undefined
+      ? {}
+      : { indicatorSpacing: indicator.spacing }),
+    ...(indicator.color === undefined
+      ? {}
+      : { indicatorColor: indicator.color }),
+    ...(indicator.activeColor === undefined
+      ? {}
+      : { indicatorActiveColor: indicator.activeColor }),
+    ...(indicator.activeWidth === undefined
+      ? {}
+      : { indicatorActiveWidth: indicator.activeWidth }),
+    ...(indicator.placement === undefined
+      ? {}
+      : { indicatorPlacement: indicator.placement }),
+  };
+}
+
 function renderChildren(props: UiIrNodeProps): ReactElement[] {
   if (!("children" in props.node)) {
     return [];
@@ -280,6 +484,21 @@ function renderChildren(props: UiIrNodeProps): ReactElement[] {
   return props.node.children.map((child) => (
     <UiIrNode {...props} key={child.id} node={child} />
   ));
+}
+
+function resolveLottie(
+  props: UiIrNodeProps,
+  assetId: string,
+): BuilderV2UiIrJsonValue {
+  const entry = props.document.lottie?.find(
+    (candidate) => candidate.assetId === assetId,
+  );
+  if (!entry) {
+    // The document contract forbids this; a document that slipped past it
+    // should fail loudly rather than draw a blank where the artwork was.
+    throw new Error(`UI IR lottie animation "${assetId}" is not in the document.`);
+  }
+  return entry.animation as BuilderV2UiIrJsonValue;
 }
 
 function resolveAsset(
@@ -303,4 +522,12 @@ function asTextStyle(style?: BuilderV2UiIrStyle): TextStyle | undefined {
 
 function asImageStyle(style?: BuilderV2UiIrStyle): ImageStyle | undefined {
   return style as ImageStyle | undefined;
+}
+
+function hasCssAnimation(style: unknown): boolean {
+  return (
+    typeof style === "object" &&
+    style !== null &&
+    ("animationName" in style || "transitionProperty" in style)
+  );
 }

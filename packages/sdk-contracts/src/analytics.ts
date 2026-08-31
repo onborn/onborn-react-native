@@ -13,7 +13,12 @@ export const BaseEventSchema = z.object({
   userId: z.string(),
   appId: z.string(),
   timestamp: z.number(),
-  platform: z.enum(["ios", "android"]),
+  /*
+   * "web" joined when the funnel host became the second event source: one
+   * flow reports from the app and from the web funnel, and the dashboard cut
+   * is App (ios+android) vs Web on this very field.
+   */
+  platform: z.enum(["ios", "android", "web"]),
   locale: z.string().optional(),
   country: z.string().optional(),
   userType: z.enum(["new", "returning"]).optional(),
@@ -22,6 +27,25 @@ export const BaseEventSchema = z.object({
   experimentId: z.string().optional(),
   experimentVariantId: z.string().optional(),
   experimentAssignmentId: z.string().optional(),
+  /**
+   * Where this person came from, captured once at funnel entry (first touch)
+   * and stamped on every event of the visit. What joins a paid click to the
+   * journey and the purchase it produced.
+   */
+  attribution: z
+    .object({
+      fbclid: z.string().max(512).optional(),
+      ttclid: z.string().max(512).optional(),
+      gclid: z.string().max(512).optional(),
+      utmSource: z.string().max(256).optional(),
+      utmMedium: z.string().max(256).optional(),
+      utmCampaign: z.string().max(256).optional(),
+      utmTerm: z.string().max(256).optional(),
+      utmContent: z.string().max(256).optional(),
+      landingUrl: z.string().max(2000).optional(),
+      referrer: z.string().max(2000).optional(),
+    })
+    .optional(),
   runtimeSource: z.literal("builder_v2").optional(),
   runtimeVersion: z.string().optional(),
   runtimeTarget: z.enum(["ios", "android", "web"]).optional(),

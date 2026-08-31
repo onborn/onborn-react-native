@@ -13,3 +13,4 @@ export * from "./ports/ui-ir-artifact-crypto";
 export * from "./ports/ui-ir-artifact-delivery";
 export * from "./ports/ui-ir-runtime-control";
 export * from "./ports/ui-ir-runtime-diagnostics";
+export * from "./application/create-ui-ir-asset-resolver";

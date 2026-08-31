@@ -5,6 +5,7 @@ import {
   type BuilderV2UiIrDocument,
 } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
+import type { UiIrAnswerStore } from "../domain/ui-ir-answers";
 import { findUiIrScreen } from "../domain/ui-ir-document";
 import {
   EMPTY_UI_IR_PLAN_SNAPSHOT,
@@ -26,6 +27,8 @@ export type UiIrScreenProps = {
    * every binding renders empty rather than a number nobody has confirmed.
    */
   plans?: UiIrPlanSnapshot;
+  /** Where this screen publishes its selections for analytics to report. */
+  answers?: UiIrAnswerStore;
 };
 
 export function UiIrScreen(props: UiIrScreenProps): ReactElement {
@@ -38,7 +41,11 @@ export function UiIrScreen(props: UiIrScreenProps): ReactElement {
   return (
     // Keyed by screen, so navigating resets selections instead of leaking one
     // screen's answer into the next.
-    <UiIrScreenStateProvider key={screen.screenId} screen={screen}>
+    <UiIrScreenStateProvider
+      key={screen.screenId}
+      screen={screen}
+      answers={props.answers}
+    >
       <UiIrPlansProvider snapshot={props.plans ?? EMPTY_UI_IR_PLAN_SNAPSHOT}>
         <UiIrNode
           assets={assets}

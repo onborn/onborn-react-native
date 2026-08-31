@@ -1,10 +1,13 @@
 import {
+  createUiIrAnswerStore,
   createUiIrJourneyController,
   type UiIrActionRuntimePorts,
+  type UiIrAnswerStore,
   type UiIrJourneyController,
   type UiIrJourneyEvent,
   type UiIrRendererPorts,
 } from "@onborn/runtime-ui-ir/actions";
+import type { UiIrIconRegistryPort } from "@onborn/runtime-ui-ir";
 import {
   loadCachedUiIrDocument,
   loadUiIrArtifactSession,
@@ -38,6 +41,8 @@ export type ExpoUiIrRuntimeSession = {
   source: RefreshUiIrArtifactResult["source"];
   failureCode?: RefreshUiIrArtifactResult["failureCode"];
   controller: UiIrJourneyController;
+  /** Where the rendered screen publishes its selections for analytics. */
+  answers: UiIrAnswerStore;
   actionPorts: Omit<UiIrActionRuntimePorts, "journey">;
   rendererPorts: Omit<UiIrRendererPorts, "handleAction">;
 };
@@ -47,6 +52,14 @@ export type ExpoUiIrRuntimeSessionInput = {
   environment: "test" | "prod";
   host: BuilderV2UiIrHostManifest;
   initialScreenId?: string;
+  /**
+   * Present one standalone paywall instead of the journey.
+   *
+   * The app asked for a paywall by name, so the session holds that screen and
+   * nothing else: the same artifact, the same bindings, the same analytics, but
+   * no steps to walk and no progress to report.
+   */
+  placement?: string;
 };
 
 export type ExpoUiIrAnalyticsSessionContext = {
@@ -55,6 +68,12 @@ export type ExpoUiIrAnalyticsSessionContext = {
   document: BuilderV2UiIrDocument;
   source: RefreshUiIrArtifactResult["source"];
   failureCode?: RefreshUiIrArtifactResult["failureCode"];
+  /**
+   * The experiment assignment the delivery named, for the analytics bridge
+   * to stamp on every event — the stamp is what joins this session's events
+   * to the variant it was served.
+   */
+  experiment?: RefreshUiIrArtifactResult["experiment"];
 };
 
 export type ExpoUiIrAnalyticsFactory = (
@@ -66,6 +85,14 @@ export type ExpoUiIrRuntimeSessionDependencies = {
   createAnalytics?: ExpoUiIrAnalyticsFactory;
   billing?: ExpoUiIrBillingPort;
   cache: UiIrArtifactCachePort;
+  /**
+   * The icons the rendered artifact may summon by name. Injected rather than
+   * imported: the full Phosphor registry drags react-native's untranspiled
+   * source into any Node process that touches this module, and which registry
+   * a host carries is the host's decision anyway — the SDK wires the complete
+   * set, a test wires none.
+   */
+  icons?: UiIrIconRegistryPort;
   /** Overridable for tests; defaults to expo-font against staged files. */
   loadFonts?: (artifact: CachedUiIrArtifact) => Promise<void>;
   capabilities?: ExpoUiIrCapabilityPort;
@@ -101,9 +128,15 @@ export async function createExpoUiIrRuntimeSession(
       document,
       source: refreshed.source,
       ...(refreshed.failureCode ? { failureCode: refreshed.failureCode } : {}),
+      ...(refreshed.experiment ? { experiment: refreshed.experiment } : {}),
     });
+  const answers = createUiIrAnswerStore();
   const controller = createUiIrJourneyController({
     document,
+    // This session is the app; web-only screens do not exist on this channel.
+    channel: "app",
+    readAnswers: (screenId) => answers.read(screenId),
+    ...(input.placement ? { placement: input.placement } : {}),
     ...(input.initialScreenId
       ? { initialScreenId: input.initialScreenId }
       : {}),
@@ -123,6 +156,7 @@ export async function createExpoUiIrRuntimeSession(
     source: refreshed.source,
     ...(refreshed.failureCode ? { failureCode: refreshed.failureCode } : {}),
     controller,
+    answers,
     actionPorts: createExpoUiIrActionPorts({
       analytics,
       billing: dependencies.billing,
@@ -130,6 +164,13 @@ export async function createExpoUiIrRuntimeSession(
     }),
     rendererPorts: {
       resolveAsset: createExpoUiIrAssetResolver(refreshed.artifact),
+      icons: dependencies.icons ?? {
+        resolve: () => {
+          throw new Error(
+            "This host wired no icon registry; pass dependencies.icons (the SDK wires @onborn/runtime-ui-ir/phosphor).",
+          );
+        },
+      },
       renderCapability: (renderInput) => {
         if (!dependencies.capabilities) {
           throw new Error(
@@ -173,6 +214,9 @@ function trackJourney(
       screenId: event.screenId,
       ...("placement" in event && event.placement
         ? { properties: { placement: event.placement } }
+        : {}),
+      ...("answers" in event && event.answers
+        ? { properties: { answers: event.answers } }
         : {}),
     }),
   ).catch(() => undefined);

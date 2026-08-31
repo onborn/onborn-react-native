@@ -103,6 +103,54 @@ describe("Builder V2 UI IR analytics bridge", () => {
     assert.equal(emitted.length, 0);
   });
 
+  it("stamps the assignment on every event and reports exposure once", async () => {
+    const emitted: BuilderV2RuntimeEvent[] = [];
+    const bridge = createBuilderV2UiIrAnalyticsBridge({
+      flowId: "flow-runtime",
+      environment: "test",
+      target: "ios",
+      artifact: artifact(),
+      release: release(),
+      document: document(),
+      sessionId: "session-runtime",
+      experiment: {
+        id: "experiment-1",
+        variantId: "variant-b",
+        variantName: "Variant B",
+        isBaseline: false,
+        assignmentId: "assignment-1",
+      },
+      emit: (event) => {
+        emitted.push(event);
+      },
+    });
+
+    await bridge.track({ event: "journey.started" });
+    await bridge.track({ event: "screen.viewed", screenId: "welcome" });
+    await bridge.track({ event: "journey.started" });
+
+    // journey.started grows an exposure event in front of it, exactly once.
+    assert.deepEqual(
+      emitted.map((event) => event.action.type),
+      ["experiment_exposed", "flow_started", "screen_viewed", "flow_started"],
+    );
+    for (const event of emitted) {
+      assert.equal(event.experiment?.id, "experiment-1");
+      assert.equal(event.experiment?.variantId, "variant-b");
+    }
+  });
+
+  it("emits no exposure without an assignment", async () => {
+    const emitted: BuilderV2RuntimeEvent[] = [];
+    const bridge = createBridge(emitted);
+    await bridge.track({ event: "journey.started" });
+    assert.deepEqual(
+      emitted.map((event) => event.action.type),
+      ["flow_started"],
+    );
+    assert.equal(emitted[0]?.experiment, undefined);
+  });
+
   it("rejects instrumentation that does not match the signed document", () => {
     const invalidArtifact = artifact();
     invalidArtifact.manifest.instrumentation!.screens[0]!.position = 1;

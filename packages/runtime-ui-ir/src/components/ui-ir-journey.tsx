@@ -10,6 +10,7 @@ import type {
 import type { UiIrActionRuntimePorts } from "../ports/ui-ir-action-runtime";
 import type { UiIrRendererPorts } from "../ports/ui-ir-renderer";
 import type { UiIrPlanSnapshot } from "../domain/ui-ir-plans";
+import type { UiIrAnswerStore } from "../domain/ui-ir-answers";
 import { UiIrScreen } from "./ui-ir-screen";
 
 export type UiIrJourneyProps = {
@@ -20,6 +21,8 @@ export type UiIrJourneyProps = {
   rendererPorts: Omit<UiIrRendererPorts, "handleAction">;
   /** The offering a paywall screen's price bindings read. */
   plans?: UiIrPlanSnapshot;
+  /** Where each screen publishes its selections for analytics to report. */
+  answers?: UiIrAnswerStore;
 };
 
 export function UiIrJourney(props: UiIrJourneyProps): ReactElement {
@@ -47,6 +50,7 @@ export function UiIrJourney(props: UiIrJourneyProps): ReactElement {
 
   return (
     <UiIrScreen
+      answers={props.answers}
       document={props.document}
       locale={props.locale}
       plans={props.plans}

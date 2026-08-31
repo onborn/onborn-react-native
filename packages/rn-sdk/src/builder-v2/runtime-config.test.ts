@@ -80,3 +80,44 @@ test("every declared capability is backed by a package this SDK ships", () => {
     );
   }
 });
+
+/*
+ * The dialect has always compiled `runtime.notifications.requestPermission`,
+ * the capability enum has always had "notifications", and the manifest has
+ * never declared it — so the first flow to ask for permissions would have been
+ * judged incompatible and the device would have quietly served the previous
+ * release. Exactly the phosphor-icons failure, still waiting.
+ *
+ * Unlike phosphor, this one cannot simply be added to the list: notifications
+ * need expo-notifications, a config plugin and platform permissions, which
+ * belong to the host app and not to this SDK. So the promise is made only when
+ * the host actually hands over a port to keep it.
+ */
+test("a host capability is promised only when the host supplies it", () => {
+  const without = createBuilderV2HostManifest("ios");
+
+  assert.ok(
+    !without.capabilities.map(({ name }) => name).includes("notifications"),
+  );
+
+  const withNotifications = createBuilderV2HostManifest("ios", {
+    hostCapabilities: ["notifications"],
+  });
+
+  assert.ok(
+    withNotifications.capabilities
+      .map(({ name }) => name)
+      .includes("notifications"),
+  );
+});
+
+test("host capabilities keep the manifest sorted and unique", () => {
+  // The manifest is compared and cached elsewhere; a wobbling order would make
+  // two identical hosts look like different ones.
+  const manifest = createBuilderV2HostManifest("ios", {
+    hostCapabilities: ["notifications", "notifications"],
+  });
+  const names = manifest.capabilities.map(({ name }) => name);
+
+  assert.deepEqual(names, [...new Set(names)].sort());
+});

@@ -26,7 +26,11 @@ export type ExpoUiIrRestoreResult =
   | { status: "empty" };
 
 export interface ExpoUiIrBillingPort {
-  purchase(input: { packageId: string }): Promise<ExpoUiIrPurchaseResult>;
+  purchase(input: {
+    packageId: string;
+    /** The paywall screen the purchase was made on, for attribution. */
+    screenId: string;
+  }): Promise<ExpoUiIrPurchaseResult>;
   restore(): Promise<ExpoUiIrRestoreResult>;
 }
 

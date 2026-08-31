@@ -16,6 +16,7 @@ import { resolveUiIrPlan, type UiIrPlanSnapshot } from "../domain/ui-ir-plans";
 import { uiIrGateHolds } from "../domain/ui-ir-state";
 import { useUiIrPlans } from "./ui-ir-plans-context";
 import { useUiIrScreenState } from "./ui-ir-screen-state";
+import { advanceAnyCarousel } from "./ui-ir-carousel-advance";
 
 type PressableNode = Extract<BuilderV2UiIrNode, { type: "pressable" }>;
 
@@ -134,6 +135,22 @@ function handlePress(
    */
   if (props.node.action.type === "state.set") {
     setState(props.node.action.state, props.node.action.value);
+    return;
+  }
+  /*
+   * Paging is the screen's own affair too: the press moves the mounted
+   * carousel, and only the last slide lets the at-end action through to the
+   * host — which is how one Continue button pages a welcome and then leaves
+   * it.
+   */
+  if (props.node.action.type === "carousel.advance") {
+    if (!advanceAnyCarousel()) {
+      void props.ports.handleAction({
+        screenId: props.screenId,
+        nodeId: props.node.id,
+        action: props.node.action.atEnd,
+      });
+    }
     return;
   }
   void props.ports.handleAction({

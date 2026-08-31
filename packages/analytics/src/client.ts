@@ -1,7 +1,12 @@
 import type { AnalyticsEvent } from "@onborn/sdk-contracts";
 import type { BuilderV2RuntimeEvent } from "@onborn/sdk-contracts/builder-v2-runtime-events";
 import { BuilderV2RuntimeEventMapper } from "./builder-v2-runtime";
-import { buildAnalyticsEvent, type AnalyticsPlatform, type TrackEventInput } from "./events";
+import {
+  buildAnalyticsEvent,
+  type AnalyticsAttribution,
+  type AnalyticsPlatform,
+  type TrackEventInput,
+} from "./events";
 import { flushBatch, type FetchLike } from "./flush";
 import { AnalyticsQueue } from "./queue";
 import { MemoryAnalyticsStorage, type AnalyticsStorage } from "./storage";
@@ -38,6 +43,13 @@ export type OnbornConfig = {
   maxAnalyticsQueueSize?: number;
   analyticsQueueKey?: string;
   analyticsStorage?: AnalyticsStorage;
+  /**
+   * Where /events lives. The default is production; the web funnel host and
+   * local development point at their own backend.
+   */
+  apiBaseUrl?: string;
+  /** First-touch acquisition context, stamped on every event of the visit. */
+  attribution?: AnalyticsAttribution;
   fetchImpl?: FetchLike;
 };
 
@@ -58,6 +70,8 @@ type AnalyticsClientOptions = {
   autoFlushMs?: number;
   storage?: AnalyticsStorage;
   fetchImpl?: FetchLike;
+  apiBaseUrl?: string;
+  attribution?: AnalyticsAttribution;
 };
 
 type WithOptionalUserId<T> = T extends { userId: string }
@@ -82,6 +96,7 @@ class AnalyticsClient {
   private readonly context: {
     appId: string;
     platform: AnalyticsPlatform;
+    attribution?: AnalyticsAttribution;
     locale?: string;
     country?: string;
     userType?: "new" | "returning";
@@ -100,6 +115,7 @@ class AnalyticsClient {
     this.context = {
       appId: options.appId,
       platform: options.platform,
+      ...(options.attribution ? { attribution: options.attribution } : {}),
       locale: options.locale,
       country: options.country,
       userType: options.userType,
@@ -115,7 +131,9 @@ class AnalyticsClient {
       options.maxQueueSize ?? DEFAULT_MAX_QUEUE_SIZE,
     );
 
-    this.endpoint = buildEventsEndpoint(DEFAULT_ONBORN_API_BASE_URL);
+    this.endpoint = buildEventsEndpoint(
+      options.apiBaseUrl ?? DEFAULT_ONBORN_API_BASE_URL,
+    );
   }
 
   async track(
@@ -244,6 +262,8 @@ export const Onborn = {
       queueKey: normalizedConfig.analyticsQueueKey,
       autoFlushMs: normalizedConfig.autoFlushMs,
       storage: normalizedConfig.analyticsStorage,
+      apiBaseUrl: normalizedConfig.apiBaseUrl,
+      attribution: normalizedConfig.attribution,
       fetchImpl: normalizedConfig.fetchImpl,
     });
     globalAnalyticsClient.startAutoFlush();

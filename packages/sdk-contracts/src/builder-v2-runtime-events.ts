@@ -22,6 +22,20 @@ const RuntimeScreenContextSchema = z
   })
   .strict();
 
+/**
+ * What the screen's selections held when it was left.
+ *
+ * A quiz answer in this dialect is a named screen state whose value is one of
+ * the strings the document itself can set, so the answer is reportable without
+ * inventing a payload: the keys are declared in the screen and the values are
+ * the ones its own `state.set` actions write. Free text never appears here,
+ * because the dialect has no state that can hold it.
+ */
+const ScreenAnswersSchema = z.record(
+  z.string().trim().min(1).max(80),
+  z.union([z.string().max(240), z.null()]),
+);
+
 const ScreenActionSchema = z
   .object({
     type: z.enum([
@@ -31,6 +45,7 @@ const ScreenActionSchema = z
       "screen_returned",
     ]),
     screenId: RuntimeIdentifierSchema,
+    answers: ScreenAnswersSchema.optional(),
   })
   .strict();
 

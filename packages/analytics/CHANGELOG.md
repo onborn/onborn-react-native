@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0-beta.1
+
+- The UI IR analytics bridge stamps every event with the session's experiment assignment and reports `experiment_exposed` once, at journey start.
+- Synced instrumentation and runtime mapping with the platform.
+
 ## 0.2.0-beta.1
 
 **Breaking: every analytics event must carry a flow name.**

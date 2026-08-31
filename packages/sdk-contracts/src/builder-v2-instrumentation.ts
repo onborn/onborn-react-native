@@ -30,6 +30,34 @@ export const BuilderV2SourceRangeSchema = z
     message: "Source range end must be greater than start",
   });
 
+/**
+ * What a screen asks of the person looking at it.
+ *
+ * Derived from the document at publish time and signed with the rest of the
+ * manifest, so anything reasoning about a screen's shape (how many options it
+ * offers, how many permissions it asks for at once) reads what actually
+ * shipped rather than re-deriving it from source nobody can verify.
+ *
+ * Only what the dialect can express: a selection holds one value at a time, so
+ * an option count is the number of distinct values the screen's own actions
+ * can write, and there is no free-text field to describe.
+ */
+export const BuilderV2InstrumentedScreenShapeSchema = z
+  .object({
+    selections: z
+      .array(
+        z
+          .object({
+            state: z.string().trim().min(1).max(80),
+            optionCount: z.number().int().nonnegative().max(200),
+          })
+          .strict(),
+      )
+      .max(24),
+    capabilities: z.array(z.string().trim().min(1).max(60)).max(8),
+  })
+  .strict();
+
 export const BuilderV2InstrumentedScreenSchema = z
   .object({
     screenId: InstrumentationIdSchema,
@@ -37,6 +65,8 @@ export const BuilderV2InstrumentedScreenSchema = z
     position: z.number().int().nonnegative(),
     surface: BuilderV2ProjectSurfaceSchema,
     placement: BuilderV2PaywallPlacementSchema.optional(),
+    /** Absent on artifacts published before shapes were recorded. */
+    shape: BuilderV2InstrumentedScreenShapeSchema.optional(),
   })
   .strict()
   .superRefine((screen, context) => {
@@ -181,6 +211,10 @@ export type BuilderV2InstrumentedScreen = z.infer<
 export type BuilderV2InstrumentedNode = z.infer<
   typeof BuilderV2InstrumentedNodeSchema
 >;
+export type BuilderV2InstrumentedScreenShape = z.infer<
+  typeof BuilderV2InstrumentedScreenShapeSchema
+>;
+
 export type BuilderV2InteractionKind = z.infer<
   typeof BuilderV2InteractionKindSchema
 >;

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0-beta.1
+
+- Experiment measurement loop: the SDK forwards `userId`/`country`/`appVersion` to artifact delivery and stamps all flow events with the served experiment assignment.
+- Synced with the platform: Lottie capability, standalone `OnbornPaywall`, host capabilities.
+- Peers now require RN >= 0.86, reanimated >= 4.5, worklets >= 0.10, `expo-file-system` >= 57, `expo-iap` >= 5 (Expo SDK 57 line).
+
 ## 0.2.0-beta.2
 
 - Bumped `@onborn/billing` to `0.1.0-beta.9`.

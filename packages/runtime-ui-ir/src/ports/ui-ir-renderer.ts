@@ -1,3 +1,4 @@
+import type { UiIrIconRegistryPort } from "./ui-ir-icon-registry";
 import type { ReactElement, ReactNode } from "react";
 import type { ImageSourcePropType } from "react-native";
 
@@ -43,6 +44,8 @@ export type UiIrNodeDecorationInput = {
 
 export type UiIrRendererPorts = {
   resolveAsset: (asset: BuilderV2UiIrAsset) => ImageSourcePropType;
+  /** The icons the artifact may summon by name; see UiIrIconRegistryPort. */
+  icons: UiIrIconRegistryPort;
   handleAction: (context: UiIrActionContext) => void | Promise<void>;
   renderCapability: (input: UiIrCapabilityRenderInput) => ReactNode;
   decorateNode?: (input: UiIrNodeDecorationInput) => ReactElement;

@@ -18,12 +18,23 @@ import type {
   OnbornRestoreResult,
 } from "./types";
 
+/** Where a purchase happened, for attribution. */
+export type OnbornPurchaseContext = {
+  /** The paywall screen the buyer tapped on. */
+  paywallId?: string;
+};
+
 export type UseOnbornOfferingOptions = {
   /**
    * Which dashboard offering to load. Omitted means the environment's current
    * one, which is what every caller got before paywalls could choose.
    */
   offeringKey?: string;
+  /**
+   * The flow a purchase from this offering belongs to. Sent with validation so
+   * revenue can be attributed to the flow that earned it.
+   */
+  flowId?: string;
   initialPackageId?: string;
   billingAdapter?: OnbornBillingAdapter;
   onPurchaseStarted?: (item: OnbornPackageWithProduct) => void;
@@ -45,7 +56,10 @@ export type UseOnbornOfferingState = {
   error: string | null;
   selectPackage: (packageId: string) => void;
   reload: () => Promise<void>;
-  purchasePackage: (packageId?: string) => Promise<OnbornPurchaseResult>;
+  purchasePackage: (
+    packageId?: string,
+    context?: OnbornPurchaseContext,
+  ) => Promise<OnbornPurchaseResult>;
   restorePurchases: () => Promise<OnbornRestoreResult>;
   refetchCustomerEntitlements: () => Promise<OnbornRestoreResult>;
 };
@@ -162,7 +176,10 @@ export function useOnbornOffering(
   }, []);
 
   const purchasePackage = useCallback(
-    async (packageId?: string): Promise<OnbornPurchaseResult> => {
+    async (
+      packageId?: string,
+      context?: OnbornPurchaseContext,
+    ): Promise<OnbornPurchaseResult> => {
       const item =
         findPackageWithProduct(packages, packageId) ?? selectedPackage;
       if (!item || !data?.offering) {
@@ -190,6 +207,12 @@ export function useOnbornOffering(
               offering: data.offering,
               item,
               result: adapterResult,
+              ...(runtimeOptions.flowId
+                ? { flowId: runtimeOptions.flowId }
+                : {}),
+              ...(context?.paywallId
+                ? { paywallId: context.paywallId }
+                : {}),
             })
           : adapterResult;
         await finalizePurchase(runtimeOptions.billingAdapter, result);

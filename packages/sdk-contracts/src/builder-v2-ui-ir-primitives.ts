@@ -76,6 +76,73 @@ export const BuilderV2UiIrJsonValueSchema: z.ZodType<BuilderV2UiIrJsonValue> =
     ]),
   );
 
+/**
+ * A Reanimated CSS animation, as the style keys that declare it.
+ *
+ * This is the artifact's loop. Entering and exiting transitions run once; a
+ * pulsing call to action, a breathing hero, an idle waveform need motion that
+ * repeats, and the only way to say that in the artifact is data — which is
+ * exactly what Reanimated 4's CSS animations are: keyframes and timing in the
+ * style object, applied by the runtime on an Animated component. Bounded so a
+ * screen cannot declare a ten-second loop on every element.
+ */
+const CssDurationSchema = z
+  .string()
+  .regex(/^\d+(\.\d+)?(ms|s)$/, 'a CSS duration like "600ms" or "1.2s"');
+
+/*
+ * Only the two properties the GPU composites for free. Anything else in a
+ * keyframe — width, height, margin, padding, flex, top — re-runs layout for
+ * the node and its siblings on every frame of every iteration, which is a
+ * loop that stutters on a mid-range Android forever. A one-off entrance can
+ * afford a layout pass; something marked "infinite" cannot, so the artifact
+ * refuses to carry it rather than trusting every author to know this.
+ */
+const CssKeyframeSchema = z
+  .object({
+    transform: BuilderV2UiIrJsonValueSchema.optional(),
+    opacity: z.number().min(0).max(1).optional(),
+  })
+  .strict(
+    "keyframes may only animate transform and opacity — anything else re-runs layout every frame and stutters; move the property into the base style or redesign the loop around scale/translate/opacity",
+  );
+
+/*
+ * The built-ins plus cubic-bezier, minus ease-in. A UI element easing in
+ * starts slow and delays exactly the moment the viewer is watching; every
+ * use of it in a screen was a mistake nobody would defend, so the contract
+ * stopped accepting it rather than the review having to catch it.
+ */
+const CssTimingFunctionSchema = z.union([
+  z.enum(["linear", "ease", "ease-out", "ease-in-out"]),
+  z
+    .string()
+    .regex(
+      /^cubic-bezier\(\s*-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\s*\)$/,
+      'a timing function like "ease-out" or "cubic-bezier(0.23, 1, 0.32, 1)"',
+    ),
+]);
+
+export const BuilderV2UiIrCssAnimationKeysSchema = z
+  .object({
+    animationName: z.record(
+      z.string().regex(/^(from|to|\d{1,3}%)$/),
+      CssKeyframeSchema,
+    ),
+    animationDuration: CssDurationSchema.optional(),
+    animationDelay: CssDurationSchema.optional(),
+    animationIterationCount: z
+      .union([z.number().int().min(1).max(20), z.literal("infinite")])
+      .optional(),
+    animationDirection: z
+      .enum(["normal", "reverse", "alternate", "alternate-reverse"])
+      .optional(),
+    animationTimingFunction: CssTimingFunctionSchema.optional(),
+    animationFillMode: z.enum(["none", "forwards", "backwards", "both"]).optional(),
+  })
+  .partial()
+  .passthrough();
+
 export const BuilderV2UiIrStyleSchema = z
   .record(z.string().min(1).max(120), BuilderV2UiIrJsonValueSchema)
   .superRefine((style, context) => {
@@ -84,6 +151,33 @@ export const BuilderV2UiIrStyleSchema = z
         code: z.ZodIssueCode.custom,
         message: "A UI IR style cannot contain more than 160 properties",
       });
+    }
+    /*
+     * Checked only when the style declares an animation, so every other style
+     * is exactly as permissive as before. A malformed animation used to pass
+     * the record and then do nothing at runtime.
+     */
+    if ("animationName" in style) {
+      const parsed = BuilderV2UiIrCssAnimationKeysSchema.safeParse(style);
+      if (!parsed.success) {
+        for (const issue of parsed.error.issues) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: issue.path,
+            message: `CSS animation: ${issue.message}`,
+          });
+        }
+      }
+      const keyframes = Object.keys(
+        (style.animationName as Record<string, unknown>) ?? {},
+      );
+      if (keyframes.length > 8) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["animationName"],
+          message: "CSS animation: at most 8 keyframes",
+        });
+      }
     }
   });
 
@@ -136,6 +230,29 @@ export const BuilderV2UiIrActionSchema = z.discriminatedUnion("type", [
       type: z.literal("state.set"),
       state: z.string().trim().min(1).max(80),
       value: z.union([z.string().max(240), z.null()]),
+    })
+    .strict(),
+  /**
+   * Page the screen's carousel forward; from the last slide, run `atEnd`.
+   *
+   * The Continue button of a paged welcome does both jobs — the references
+   * advance the slides until the last one, and only then leave the screen —
+   * and without this the two behaviours could not share one button. `atEnd`
+   * is deliberately just navigation: the end of a pager is a place in the
+   * journey, not a purchase or a link.
+   */
+  z
+    .object({
+      type: z.literal("carousel.advance"),
+      atEnd: z
+        .object({
+          type: z.enum([
+            "navigation.next",
+            "navigation.complete",
+            "navigation.back",
+          ]),
+        })
+        .strict(),
     })
     .strict(),
   z.object({ type: z.literal("navigation.next") }).strict(),
@@ -248,6 +365,23 @@ export type BuilderV2UiIrNode =
       resizeMode?: "cover" | "contain" | "stretch" | "center";
       children: BuilderV2UiIrNode[];
     })
+  /*
+   * A vector animation the artifact carries.
+   *
+   * `assetId` names an entry in the document's `lottie` list, where the
+   * animation JSON itself travels — inline, because the artifact is one
+   * signed document and a generated animation is tens of kilobytes, not a
+   * file worth a second delivery path. The host lends the player: a flow
+   * that uses this compiles to a "lottie" requirement, and a host that has
+   * not lent one is incompatible rather than silently blank.
+   */
+  | (NodeBase & {
+      type: "lottie";
+      assetId: string;
+      loop: boolean;
+      speed?: number;
+      resizeMode?: "cover" | "contain" | "center";
+    })
   | (NodeBase & {
       type: "pressable";
       action: z.infer<typeof BuilderV2UiIrActionSchema>;
@@ -311,6 +445,39 @@ export type BuilderV2UiIrNode =
       component: string;
       props: BuilderV2UiIrJsonValue;
     })
+  /*
+   * A chart the SDK draws, from data the artifact carries.
+   *
+   * Every other route to a chart failed the "no host code" bar: a host
+   * component means the flow only runs in an app that supplies one, and
+   * hand-drawn SVG means the model computing axes and bar heights in source.
+   * The series is static — it is onboarding copy, not live data — so the
+   * artifact stays a description and the runtime does the arithmetic with the
+   * react-native-svg it already ships.
+   */
+  | (NodeBase & {
+      type: "chart";
+      variant: "bar" | "line";
+      series: Array<{ label?: string; value: number }>;
+    })
+  /*
+   * A layer above the screen: a bottom sheet, a dialog, a picker.
+   *
+   * The dialect could describe a screen and nothing on top of one, so an age
+   * or weight picker — a button that opens a sheet — had no expression at all.
+   * It needs no new machinery: `presence` already gates a node on screen
+   * state, which is exactly what "the sheet is open" means, and the sheet's
+   * own look is ordinary layout written inside it.
+   *
+   * `dismiss` is required rather than optional. A sheet with no way back is
+   * the one failure mode this node makes easy, and the platform's own back
+   * gesture has to land somewhere.
+   */
+  | (NodeBase & {
+      type: "modal";
+      dismiss: z.infer<typeof BuilderV2UiIrActionSchema>;
+      children: BuilderV2UiIrNode[];
+    })
   /**
    * Repeats its children once per plan in the loaded offering.
    *
@@ -327,6 +494,59 @@ export type BuilderV2UiIrNode =
       type: "billing-plans";
       limit: number;
       children: BuilderV2UiIrNode[];
+    })
+  /**
+   * A horizontally paged strip of its children, one child per page.
+   *
+   * The most-asked-for onboarding screen in the world — full-bleed images the
+   * person swipes through — had no way to be described. A screen may not read
+   * the device size, so its author could not make a page exactly one viewport
+   * wide, and the paging, the page dots and the auto-advance are all motion
+   * driven by a gesture, which a document cannot express at all. Every attempt
+   * therefore ended as runtime code the compiler rejected: "UI IR only accepts
+   * statically serializable values", after the model had already written the
+   * screen twice.
+   *
+   * So the artifact names the pattern and the runtime performs it. The page
+   * width is measured on the device, which is also the only place it is known.
+   */
+  | (NodeBase & {
+      type: "carousel";
+      /** Page dots under the strip. */
+      showsIndicator: boolean;
+      /**
+       * How the dots look, matched to the reference's indicator — dot size,
+       * spacing, fills, and the widened active pill. Absent fields keep the
+       * runtime defaults; the whole object absent is the generic indicator.
+       */
+      indicator?: {
+        size?: number;
+        spacing?: number;
+        color?: string;
+        activeColor?: string;
+        activeWidth?: number;
+        placement?: "top" | "bottom";
+      };
+      /** Advances on its own every N milliseconds when set. */
+      autoAdvanceMs?: number;
+      children: BuilderV2UiIrNode[];
+    })
+  /**
+   * A segmented control whose selection slides between segments.
+   *
+   * The slide is interaction-driven motion, which the document cannot carry —
+   * every authored switcher therefore degraded to two fills swapping colour.
+   * The document names the segments and the state they select into; the
+   * runtime owns the pill, its measurement and its movement.
+   */
+  | (NodeBase & {
+      type: "segmented-control";
+      /** The screen state the selection is written to, as a slot string. */
+      state: string;
+      segments: Array<{ value: string; label: BuilderV2UiIrText }>;
+      pillStyle?: BuilderV2UiIrStyle;
+      labelStyle?: BuilderV2UiIrStyle;
+      selectedLabelStyle?: BuilderV2UiIrStyle;
     });
 
 const CommonNodeSchema = z.object({
@@ -393,6 +613,13 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
         children: z.array(BuilderV2UiIrNodeSchema).max(1_000),
       }).strict(),
       CommonNodeSchema.extend({
+        type: z.literal("lottie"),
+        assetId: UiIrIdSchema,
+        loop: z.boolean(),
+        speed: z.number().min(0.25).max(3).optional(),
+        resizeMode: z.enum(["cover", "contain", "center"]).optional(),
+      }).strict(),
+      CommonNodeSchema.extend({
         type: z.literal("pressable"),
         action: BuilderV2UiIrActionSchema,
         disabled: z
@@ -449,9 +676,70 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
         props: BuilderV2UiIrJsonValueSchema,
       }).strict(),
       CommonNodeSchema.extend({
+        type: z.literal("chart"),
+        variant: z.enum(["bar", "line"]),
+        series: z
+          .array(
+            z
+              .object({
+                label: z.string().trim().min(1).max(40).optional(),
+                value: z.number().finite(),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(24),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("modal"),
+        dismiss: BuilderV2UiIrActionSchema,
+        children: z.array(BuilderV2UiIrNodeSchema).max(1_000),
+      }).strict(),
+      CommonNodeSchema.extend({
         type: z.literal("billing-plans"),
         limit: z.number().int().min(1).max(8),
         children: z.array(BuilderV2UiIrNodeSchema).max(1_000),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("carousel"),
+        showsIndicator: z.boolean(),
+        // Bounds mirror the compiler's: dots stay dots, and the widened
+        // active pill stays an indicator rather than a progress bar.
+        indicator: z
+          .object({
+            size: z.number().min(4).max(16).optional(),
+            spacing: z.number().min(2).max(24).optional(),
+            color: z.string().trim().min(1).max(80).optional(),
+            activeColor: z.string().trim().min(1).max(80).optional(),
+            activeWidth: z.number().min(4).max(64).optional(),
+            placement: z.enum(["top", "bottom"]).optional(),
+          })
+          .strict()
+          .optional(),
+        // Bounded at both ends: below a second nobody can read the slide, and
+        // past twenty the strip reads as static and the dots as decoration.
+        autoAdvanceMs: z.number().int().min(1_000).max(20_000).optional(),
+        children: z.array(BuilderV2UiIrNodeSchema).max(24),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("segmented-control"),
+        state: z.string().trim().min(1).max(80),
+        // Two is the point of a switcher; past six it is a picker wearing the
+        // wrong control.
+        segments: z
+          .array(
+            z
+              .object({
+                value: z.string().max(240),
+                label: BuilderV2UiIrTextSchema,
+              })
+              .strict(),
+          )
+          .min(2)
+          .max(6),
+        pillStyle: BuilderV2UiIrStyleSchema.optional(),
+        labelStyle: BuilderV2UiIrStyleSchema.optional(),
+        selectedLabelStyle: BuilderV2UiIrStyleSchema.optional(),
       }).strict(),
     ]),
 );

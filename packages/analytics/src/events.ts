@@ -1,6 +1,6 @@
 import { AnalyticsEventSchema, type AnalyticsEvent } from "@onborn/sdk-contracts";
 
-export type AnalyticsPlatform = "ios" | "android";
+export type AnalyticsPlatform = "ios" | "android" | "web";
 
 type CommonEventFields =
   | "eventId"
@@ -30,6 +30,19 @@ export type TrackEventInput = {
   flowName?: string;
 };
 
+export type AnalyticsAttribution = {
+  fbclid?: string;
+  ttclid?: string;
+  gclid?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmTerm?: string;
+  utmContent?: string;
+  landingUrl?: string;
+  referrer?: string;
+};
+
 export type EventContext = {
   appId: string;
   platform: AnalyticsPlatform;
@@ -40,6 +53,8 @@ export type EventContext = {
   sdkVersion: string;
   onboardingFlowName?: string;
   paywallName?: string;
+  /** First-touch acquisition context, stamped on every event of the visit. */
+  attribution?: AnalyticsAttribution;
 };
 
 /** Thrown when an event has no name to report — see `Onborn.init`. */
@@ -99,6 +114,7 @@ export function buildAnalyticsEvent(
     userType: context.userType,
     appVersion: context.appVersion,
     sdkVersion: context.sdkVersion,
+    ...(context.attribution ? { attribution: context.attribution } : {}),
   };
 
   return AnalyticsEventSchema.parse(candidate);
