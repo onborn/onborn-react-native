@@ -9,6 +9,7 @@ import {
 } from "@onborn/runtime-ui-ir/actions";
 import type { UiIrIconRegistryPort } from "@onborn/runtime-ui-ir";
 import {
+  createUiIrLoadTrace,
   loadCachedUiIrDocument,
   loadUiIrArtifactSession,
   type CachedUiIrArtifact,
@@ -104,7 +105,44 @@ export type ExpoUiIrRuntimeSessionDependencies = {
   decorateNode?: ExpoUiIrNodeDecorator;
   onComplete: () => void;
   onDismiss: () => void;
+  /**
+   * The journey as the host app hears it: every screen change with what has
+   * been answered so far, and every custom event a screen tracks. Raw
+   * answers — this is the app's own data, not Onborn's analytics — so the
+   * app can save a profile on completion or fetch what a step needs on view.
+   */
+  onJourneyEvent?: (event: ExpoUiIrJourneyHostEvent) => void;
 };
+
+export type ExpoUiIrJourneyHostEvent =
+  | {
+      type: UiIrJourneyEvent["type"];
+      screenId: string;
+      placement?: string;
+      /** Everything answered so far, by state name. */
+      answers: Readonly<Record<string, string>>;
+      /** This screen's own values, on completion. */
+      screenAnswers?: Readonly<Record<string, string | null>>;
+    }
+  | {
+      type: "custom";
+      name: string;
+      screenId: string;
+      properties?: Readonly<Record<string, unknown>>;
+      answers: Readonly<Record<string, string>>;
+    };
+
+/* The journey's own vocabulary; anything else a screen tracks is custom. */
+const JOURNEY_EVENT_TYPES = new Set<string>([
+  "journey.started",
+  "screen.viewed",
+  "screen.completed",
+  "screen.returned",
+  "journey.completed",
+  "journey.dismissed",
+  "paywall.viewed",
+  "paywall.dismissed",
+]);
 
 export async function createExpoUiIrRuntimeSession(
   input: ExpoUiIrRuntimeSessionInput,
@@ -112,14 +150,21 @@ export async function createExpoUiIrRuntimeSession(
 ): Promise<ExpoUiIrRuntimeSession> {
   assertNativeHost(input.host);
   assertAnalyticsConfiguration(dependencies);
+  const trace = createUiIrLoadTrace(`session ${input.flowId.slice(0, 8)}`);
   const refreshed = await loadUiIrArtifactSession(input, dependencies);
+  trace.mark("artifact ready (control ∥ refresh)");
   // Typography is part of the artifact; the session is not ready until the
-  // fonts it shipped are loadable by name.
-  await (dependencies.loadFonts ?? loadUiIrArtifactFonts)(refreshed.artifact);
-  const document = await loadCachedUiIrDocument(refreshed.artifact, {
-    cache: dependencies.cache,
-    crypto: dependencies.crypto,
-  });
+  // fonts it shipped are loadable by name. Fonts register while the document
+  // is read and parsed — the two touch different files and neither needs the
+  // other, so paying for them one after the other was pure wait.
+  const [, document] = await Promise.all([
+    (dependencies.loadFonts ?? loadUiIrArtifactFonts)(refreshed.artifact),
+    loadCachedUiIrDocument(refreshed.artifact, {
+      cache: dependencies.cache,
+      crypto: dependencies.crypto,
+    }),
+  ]);
+  trace.mark("fonts + document loaded");
   const analytics =
     dependencies.analytics ??
     dependencies.createAnalytics?.({
@@ -136,20 +181,50 @@ export async function createExpoUiIrRuntimeSession(
     // This session is the app; web-only screens do not exist on this channel.
     channel: "app",
     readAnswers: (screenId) => answers.read(screenId),
+    readVariables: () => answers.variables(),
     ...(input.placement ? { placement: input.placement } : {}),
     ...(input.initialScreenId
       ? { initialScreenId: input.initialScreenId }
       : {}),
     onComplete: dependencies.onComplete,
     onDismiss: dependencies.onDismiss,
-    ...(analytics
+    onEvent: (event) => {
+      if (analytics) trackJourney(analytics, event);
+      dependencies.onJourneyEvent?.({
+        type: event.type,
+        screenId: event.screenId,
+        ...("placement" in event && event.placement
+          ? { placement: event.placement }
+          : {}),
+        answers: answers.variables(),
+        ...(event.type === "screen.completed"
+          ? { screenAnswers: answers.read(event.screenId) ?? {} }
+          : {}),
+      });
+    },
+  });
+  /*
+   * A screen's own events reach the host app too: `runtime.analytics.track
+   * ("lead_captured")` is the app's cue as much as Onborn's metric.
+   */
+  const hostAwareAnalytics: ExpoUiIrAnalyticsPort | undefined =
+    dependencies.onJourneyEvent
       ? {
-          onEvent: (event) => {
-            trackJourney(analytics, event);
+          track: (event) => {
+            if (!JOURNEY_EVENT_TYPES.has(event.event)) {
+              dependencies.onJourneyEvent?.({
+                type: "custom",
+                name: event.event,
+                screenId: event.screenId ?? "",
+                ...(event.properties ? { properties: event.properties } : {}),
+                answers: answers.variables(),
+              });
+            }
+            return analytics?.track(event);
           },
         }
-      : {}),
-  });
+      : analytics;
+  trace.end();
   return {
     artifact: refreshed.artifact,
     document,
@@ -158,7 +233,7 @@ export async function createExpoUiIrRuntimeSession(
     controller,
     answers,
     actionPorts: createExpoUiIrActionPorts({
-      analytics,
+      analytics: hostAwareAnalytics,
       billing: dependencies.billing,
       capabilities: dependencies.capabilities,
     }),

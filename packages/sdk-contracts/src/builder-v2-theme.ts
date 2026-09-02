@@ -96,11 +96,29 @@ export const BuilderV2ThemeSchema = z
     schemaVersion: z.literal(BUILDER_V2_THEME_SCHEMA_VERSION),
     light: BuilderV2ThemeModeSchema,
     dark: BuilderV2ThemeModeSchema,
+    /*
+     * Three roles were the whole scale, and every real product turned out to
+     * carry five to eight steps — a 24pt step title between the 32pt hero and
+     * 16pt body, a 14pt caption under a card, a 12pt overline. Screens wrote
+     * the missing steps as literals, which is the one thing the contract
+     * exists to prevent. The new roles are optional so every published theme
+     * stays valid; a screen may only use a role its theme declares.
+     */
     typography: z
       .object({
+        /** The largest statement on a screen: a hero number, a splash. */
+        display: ThemeFontSchema.optional(),
         headline: ThemeFontSchema,
+        /** A step's question or a section heading, under the headline. */
+        title: ThemeFontSchema.optional(),
+        /** A card's name, a row's primary line. */
+        subtitle: ThemeFontSchema.optional(),
         body: ThemeFontSchema,
+        /** Supporting prose under a title or a card: the why, the fine print. */
+        caption: ThemeFontSchema.optional(),
         label: ThemeFontSchema,
+        /** An eyebrow or a header tag, usually tracked and small. */
+        overline: ThemeFontSchema.optional(),
       })
       .strict(),
     /*
@@ -110,6 +128,33 @@ export const BuilderV2ThemeSchema = z
      * 96 refused the most common button shape in mobile onboarding and killed
      * runs that asked for one, so the bound only has to stop nonsense.
      */
+    /*
+     * Tempo is a token like colour is. Without it every screen wrote its own
+     * 300 and 350 and .delay(120), and two screens from the same run moved
+     * at different speeds. Optional so every published theme stays valid.
+     */
+    motion: z
+      .object({
+        duration: z
+          .object({
+            /** A tap's feedback, a card's selection: felt, not watched. */
+            quick: z.number().int().min(0).max(1_000),
+            /** An element entering, a screen arriving. */
+            base: z.number().int().min(0).max(2_000),
+            /** A hero settling, a bar filling. */
+            slow: z.number().int().min(0).max(4_000),
+          })
+          .strict(),
+        /** The one curve every transition eases with, a CSS timing function. */
+        easing: z
+          .string()
+          .regex(
+            /^(linear|ease|ease-out|ease-in-out|cubic-bezier\(\s*-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\s*\))$/,
+            'a timing function like "ease-out" or "cubic-bezier(0.23, 1, 0.32, 1)"',
+          ),
+      })
+      .strict()
+      .optional(),
     radii: z
       .object({
         card: z.number().finite().min(0).max(9_999),

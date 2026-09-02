@@ -11,6 +11,13 @@ export const BuilderV2ProjectAssetMediaTypeSchema = z.enum([
   "image/jpeg",
   "image/png",
   "image/webp",
+  /*
+   * Video: the fist bump on a thank-you screen, a looping hero behind a
+   * paywall. Stored and published like an image; played by the host's
+   * player (see the "video" capability) or the browser's <video>.
+   */
+  "video/mp4",
+  "video/webm",
   "application/json",
   "font/ttf",
   "font/otf",

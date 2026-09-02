@@ -15,10 +15,23 @@ import { placeUiIrPressableStyles } from "../domain/ui-ir-pressable-styles";
 import { resolveUiIrPlan, type UiIrPlanSnapshot } from "../domain/ui-ir-plans";
 import { uiIrGateHolds } from "../domain/ui-ir-state";
 import { useUiIrPlans } from "./ui-ir-plans-context";
-import { useUiIrScreenState } from "./ui-ir-screen-state";
+import { useUiIrScreenState, useUiIrVariables } from "./ui-ir-screen-state";
 import { advanceAnyCarousel } from "./ui-ir-carousel-advance";
+import { toReanimatedCssStyle } from "./ui-ir-css-easing";
 
 type PressableNode = Extract<BuilderV2UiIrNode, { type: "pressable" }>;
+
+/**
+ * Press feedback animates the Pressable itself, not a wrapper around it.
+ *
+ * The wrapper version broke parent-driven layout: the source styles the
+ * Pressable directly, so `flex: 1` on a quiz option must make the option the
+ * growing flex child of its row. Wrapped in an unstyled Animated.View, the
+ * wrapper was the flex child, sized to content, and a row of options packed
+ * left on the device while the builder — rendering the real source — spread
+ * them across the row.
+ */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type UiIrPressableProps = {
   node: PressableNode;
@@ -72,12 +85,75 @@ export function UiIrPressable(props: UiIrPressableProps) {
     [hasOpacityFeedback, hasScaleFeedback],
   );
   const [pressed, setPressed] = useState(false);
+  /*
+   * A press that asks the app something is busy until the app answers — no
+   * second submit, and the screen reader hears it. Only host actions wait;
+   * every other action settles at once.
+   */
+  const [busy, setBusy] = useState(false);
+  const answers = useUiIrVariables();
+  /*
+   * The node's resolved style already went through the Reanimated easing
+   * bridge in UiIrNode; the pressed and content styles are read straight off
+   * the node here, so they cross it here.
+   */
   const placed = placeUiIrPressableStyles({
-    style: props.style ?? props.node.style,
-    pressedStyle: props.node.pressedStyle,
-    contentStyle: props.node.contentStyle,
+    style: props.style ?? toReanimatedCssStyle(props.node.style),
+    pressedStyle: toReanimatedCssStyle(props.node.pressedStyle),
+    contentStyle: toReanimatedCssStyle(props.node.contentStyle),
     pressed,
   });
+
+  const pressableHandlers = {
+    ...common,
+    accessibilityState: { ...common.accessibilityState, busy },
+    disabled: disabled || busy,
+    onPress: () =>
+      handlePress(
+        props,
+        screenState.set,
+        (source) =>
+          resolvePurchaseTarget(source, {
+            plans: plans.snapshot,
+            currentIndex: plans.currentIndex,
+            values: screenState.values,
+          }),
+        answers,
+        setBusy,
+      ),
+    onPressIn: () => {
+      setPressed(true);
+      animateFeedback(props.node, scale, opacity, true);
+      triggerHaptic(props);
+    },
+    onPressOut: () => {
+      setPressed(false);
+      animateFeedback(props.node, scale, opacity, false);
+    },
+  };
+
+  /*
+   * A plain `<Pressable style={...}>` in the source is ONE box, so it renders
+   * as one box: the animated Pressable carries the node's style and is the
+   * flex child its parent lays out. Only the Animated.View-wrapping idiom
+   * (recognised by `contentStyle`) keeps the outer/inner split the source
+   * actually had.
+   */
+  if (props.node.contentStyle === undefined) {
+    return (
+      <AnimatedPressable
+        {...pressableHandlers}
+        style={[
+          ...placed.pressable.map((style) =>
+            asViewStyle(style as PressableNode["style"]),
+          ),
+          animatedStyle,
+        ]}
+      >
+        {props.children}
+      </AnimatedPressable>
+    );
+  }
 
   return (
     <Animated.View
@@ -89,26 +165,7 @@ export function UiIrPressable(props: UiIrPressableProps) {
       ]}
     >
       <Pressable
-        {...common}
-        disabled={disabled}
-        onPress={() =>
-          handlePress(props, screenState.set, (source) =>
-            resolvePurchaseTarget(source, {
-              plans: plans.snapshot,
-              currentIndex: plans.currentIndex,
-              values: screenState.values,
-            }),
-          )
-        }
-        onPressIn={() => {
-          setPressed(true);
-          animateFeedback(props.node, scale, opacity, true);
-          triggerHaptic(props);
-        }}
-        onPressOut={() => {
-          setPressed(false);
-          animateFeedback(props.node, scale, opacity, false);
-        }}
+        {...pressableHandlers}
         style={placed.pressable.map((style) =>
           asViewStyle(style as PressableNode["style"]),
         )}
@@ -128,6 +185,8 @@ function handlePress(
       { type: "billing.purchase" }
     >["source"],
   ) => string | undefined,
+  answers: Readonly<Record<string, string>>,
+  setBusy: (busy: boolean) => void,
 ): void {
   /*
    * Selection is the screen's own affair; it never leaves the device, so it is
@@ -153,12 +212,21 @@ function handlePress(
     }
     return;
   }
-  void props.ports.handleAction({
+  const outcome = props.ports.handleAction({
     screenId: props.screenId,
     nodeId: props.node.id,
     action: props.node.action,
     resolvePurchaseTarget,
+    answers,
   });
+  if (props.node.action.type === "capability.invoke") {
+    setBusy(true);
+    void Promise.resolve(outcome)
+      .catch(() => undefined)
+      .finally(() => setBusy(false));
+    return;
+  }
+  void outcome;
 }
 
 /**

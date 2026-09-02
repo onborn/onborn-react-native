@@ -37,6 +37,21 @@ export type BuilderV2UiIrPressFeedback = z.infer<
 export const BuilderV2UiIrScreenStateSchema = z
   .object({
     initial: z.union([z.string().max(240), z.null()]),
+    /**
+     * Present on a state a text field writes.
+     *
+     * A selection is one of a few known values and is reported as it is; free
+     * text is whatever a person typed — usually their name — and leaves the
+     * device only as "provided" unless the field opted into reporting the
+     * value. The analytics allowlists the gym apps keep by hand are this
+     * decision made once, in the document.
+     */
+    text: z
+      .object({
+        report: z.enum(["presence", "value"]),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -72,9 +87,34 @@ export type BuilderV2UiIrStateCondition = z.infer<
  * out three plans and show only the two the offering actually has, instead of
  * rendering an empty row or inventing one.
  */
+/**
+ * "The journey is at its first (or last) screen", or "this screen asked the
+ * chrome for variant V" — the predicates the chrome above the screens needs:
+ * no back control on the first step, a white header on the outro.
+ */
+export const BuilderV2UiIrJourneyConditionSchema = z
+  .object({
+    journey: z.enum(["isFirst", "isLast", "variant"]),
+    equals: z.union([z.string().max(40), z.null()]).optional(),
+    negate: z.boolean().optional(),
+  })
+  .strict()
+  .refine(
+    (condition) =>
+      condition.journey === "variant"
+        ? condition.equals !== undefined
+        : condition.equals === undefined,
+    "variant compares against a value; isFirst and isLast take none",
+  );
+
+export type BuilderV2UiIrJourneyCondition = z.infer<
+  typeof BuilderV2UiIrJourneyConditionSchema
+>;
+
 export const BuilderV2UiIrConditionSchema = z.union([
   BuilderV2UiIrStateConditionSchema,
   BuilderV2UiIrPlanConditionSchema,
+  BuilderV2UiIrJourneyConditionSchema,
 ]);
 
 export type BuilderV2UiIrCondition = z.infer<

@@ -139,6 +139,17 @@ export const BuilderV2UiIrReleaseSchema = z
 export const BuilderV2UiIrArtifactDeliveryFileSchema =
   BuilderV2UiIrArtifactFileSchema.extend({
     url: z.string().url().max(8_192),
+    /**
+     * The file's bytes, base64, delivered inline instead of by URL.
+     *
+     * Only for small, critical files (the document): inlining removes a full
+     * storage round trip from the cold start's critical path. The client
+     * verifies the content hash either way, so inline bytes carry the same
+     * integrity as downloaded ones. Sent only to clients that ask
+     * (`inline=1`) — the schema is strict and older SDKs would reject the
+     * extra key.
+     */
+    contents: z.string().max(600_000).optional(),
   }).strict();
 
 export const BuilderV2UiIrArtifactDeliverySchema = z

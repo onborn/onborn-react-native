@@ -26,6 +26,15 @@ export type CachedUiIrArtifact = {
 export interface UiIrArtifactCachePort {
   readActive(scope: UiIrArtifactCacheScope): Promise<CachedUiIrArtifact | null>;
   readFile(uri: string): Promise<Uint8Array | null>;
+  /**
+   * Whether a cached file still exists, without reading its bytes.
+   *
+   * Optional fast path for the warm-start cache check: files were
+   * hash-verified when staged, so on later launches presence is enough for
+   * everything except the document. A cache that cannot answer cheaply omits
+   * this and the caller falls back to reading the bytes.
+   */
+  hasFile?(uri: string): Promise<boolean>;
   createStage(input: {
     scope: UiIrArtifactCacheScope;
     release: BuilderV2UiIrRelease;

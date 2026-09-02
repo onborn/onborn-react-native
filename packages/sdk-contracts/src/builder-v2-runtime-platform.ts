@@ -7,6 +7,8 @@ export const BuilderV2RuntimeVersionSchema = z
   .regex(/^onborn-runtime-[1-9]\d*$/);
 
 export const BuilderV2CapabilityNameSchema = z.enum([
+  /** The app's own named handlers, lent as `actions={{ … }}`; see the project manifest. */
+  "actions",
   "analytics",
   "assets",
   "auth",
@@ -25,6 +27,8 @@ export const BuilderV2CapabilityNameSchema = z.enum([
   "reanimated",
   "safe-area",
   "store-review",
+  /** The host's video player, lent like the Lottie player; see rn-sdk. */
+  "video",
 ]);
 
 /**

@@ -3,6 +3,7 @@ export * from "./application/load-ui-ir-artifact-session";
 export * from "./application/load-cached-ui-ir-document";
 export * from "./application/refresh-ui-ir-artifact";
 export * from "./domain/ui-ir-artifact-errors";
+export * from "./domain/ui-ir-load-trace";
 export * from "./infrastructure/http-ui-ir-artifact-delivery";
 export * from "./infrastructure/http-ui-ir-runtime-control";
 export * from "./infrastructure/http-ui-ir-runtime-diagnostics";

@@ -1,7 +1,8 @@
-import type {
-  BuilderV2UiIrDocument,
-  BuilderV2UiIrScreen,
-  BuilderV2UiIrText,
+import {
+  resolveBuilderV2UiIrPlaceholders,
+  type BuilderV2UiIrDocument,
+  type BuilderV2UiIrScreen,
+  type BuilderV2UiIrText,
 } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
 export function findUiIrScreen(
@@ -17,7 +18,24 @@ export function findUiIrScreen(
   return screen;
 }
 
+/**
+ * The string a text node shows, with its `{{placeholders}}` filled from what
+ * the journey has collected. Resolved even with no variables at hand, so a
+ * placeholder never reaches the screen as its own braces.
+ */
 export function resolveUiIrText(
+  document: BuilderV2UiIrDocument,
+  text: BuilderV2UiIrText,
+  locale?: string,
+  variables: Readonly<Record<string, string | null | undefined>> = {},
+): string {
+  return resolveBuilderV2UiIrPlaceholders(
+    resolveUiIrTextTemplate(document, text, locale),
+    variables,
+  );
+}
+
+function resolveUiIrTextTemplate(
   document: BuilderV2UiIrDocument,
   text: BuilderV2UiIrText,
   locale?: string,

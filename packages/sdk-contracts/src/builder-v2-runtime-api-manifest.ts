@@ -211,6 +211,11 @@ export const BUILDER_V2_RUNTIME_API_MANIFEST = {
         },
       },
     },
+    actions: {
+      required: false,
+      // Named by each project's manifest, not by the platform.
+      methods: {},
+    },
     storeReview: {
       required: false,
       methods: {
@@ -233,5 +238,7 @@ export const BUILDER_V2_RUNTIME_API_MANIFEST = {
     surface: "Surface of the active screen: onboarding or paywall.",
     isFirst: "Whether the active screen is the first journey screen.",
     isLast: "Whether the active screen is the last journey screen.",
+    answers:
+      "What earlier screens collected, by state name; journey.answers.name compiles to a {{name}} placeholder the runtime fills.",
   },
 } as const satisfies BuilderV2RuntimeApiManifest;

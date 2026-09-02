@@ -40,6 +40,8 @@ export type ExpoUiIrCapabilityInvocation = {
   input?: BuilderV2UiIrJsonValue;
   screenId: string;
   nodeId: string;
+  /** The journey's answers so far, for the app's own handlers. */
+  answers?: Readonly<Record<string, string>>;
 };
 
 export type ExpoUiIrCapabilityRender = {

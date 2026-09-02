@@ -33,10 +33,19 @@ export async function loadUiIrArtifactSession(
   dependencies: LoadDependencies,
 ): Promise<RefreshUiIrArtifactResult> {
   const startedAt = dependencies.clock?.now() ?? Date.now();
+  /*
+   * The kill switch and the artifact refresh race the network side by side —
+   * serially they each cost a full round trip before anything rendered. The
+   * gate still holds: nothing is returned (so nothing renders) until the
+   * control check passes; a disabled runtime merely wasted a fetch it would
+   * have made tomorrow anyway.
+   */
+  const refreshing = refreshUiIrArtifact(input, dependencies);
+  refreshing.catch(() => undefined);
   await assertRuntimeEnabled(input, dependencies, startedAt);
 
   try {
-    const result = await refreshUiIrArtifact(input, dependencies);
+    const result = await refreshing;
     await report(dependencies.diagnostics, {
       ...baseEvent(input, dependencies, startedAt),
       event: "load_succeeded",

@@ -4,12 +4,13 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
 import type { BuilderV2UiIrScreen } from "@onborn/sdk-contracts/builder-v2-ui-ir";
 
-import type { UiIrAnswerStore } from "../domain/ui-ir-answers";
+import type { UiIrAnswerStore, UiIrVariables } from "../domain/ui-ir-answers";
 import {
   initialUiIrStateValues,
   type UiIrStateValues,
@@ -41,10 +42,17 @@ export function UiIrScreenStateProvider(props: {
    */
   answers?: UiIrAnswerStore;
 }) {
-  const [values, setValues] = useState<UiIrStateValues>(() =>
-    initialUiIrStateValues(props.screen),
-  );
   const { answers, screen } = props;
+  /*
+   * A screen someone comes back to shows what they left on it. The state is
+   * mounted fresh per screen (so one screen's selection never leaks into the
+   * next), and the answer store is exactly the record of what this screen
+   * held — the name typed two screens ago was gone on the way back, and a
+   * quiz card lost its tick.
+   */
+  const [values, setValues] = useState<UiIrStateValues>(
+    () => answers?.read(screen.screenId) ?? initialUiIrStateValues(screen),
+  );
   useEffect(() => {
     answers?.record(screen.screenId, values);
   }, [answers, screen.screenId, values]);
@@ -57,12 +65,46 @@ export function UiIrScreenStateProvider(props: {
     [values],
   );
   return (
-    <UiIrScreenStateContext.Provider value={value}>
-      {props.children}
-    </UiIrScreenStateContext.Provider>
+    <UiIrAnswersContext.Provider value={answers ?? null}>
+      <UiIrScreenStateContext.Provider value={value}>
+        {props.children}
+      </UiIrScreenStateContext.Provider>
+    </UiIrAnswersContext.Provider>
   );
 }
 
 export function useUiIrScreenState(): UiIrScreenStateValue {
   return useContext(UiIrScreenStateContext);
+}
+
+/*
+ * The journey's answers, for copy that speaks them back. Held in a context of
+ * its own so a text node twelve levels down can read `{{name}}` without every
+ * node between knowing the store exists.
+ */
+const UiIrAnswersContext = createContext<UiIrAnswerStore | null>(null);
+
+const NO_VARIABLES: UiIrVariables = Object.freeze({});
+const subscribeToNothing = () => () => undefined;
+
+/**
+ * What `{{name}}` resolves to on this screen right now: everything earlier
+ * screens recorded, with this screen's own live values on top — so a greeting
+ * beside the field updates as the person types, not after they leave.
+ */
+export function useUiIrVariables(): UiIrVariables {
+  const store = useContext(UiIrAnswersContext);
+  const recorded = useSyncExternalStore(
+    store?.subscribe ?? subscribeToNothing,
+    () => store?.variables() ?? NO_VARIABLES,
+    () => store?.variables() ?? NO_VARIABLES,
+  );
+  const { values } = useUiIrScreenState();
+  return useMemo(() => {
+    const merged: Record<string, string> = { ...recorded };
+    for (const [name, value] of Object.entries(values)) {
+      if (typeof value === "string") merged[name] = value;
+    }
+    return merged;
+  }, [recorded, values]);
 }

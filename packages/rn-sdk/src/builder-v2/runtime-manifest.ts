@@ -35,7 +35,13 @@ const BUILT_IN_CAPABILITIES: BuilderV2UiIrHostManifest["capabilities"] =
  */
 export type BuilderV2HostCapability = Extract<
   BuilderV2CapabilityName,
-  "notifications" | "camera" | "haptics" | "lottie" | "auth"
+  | "notifications"
+  | "camera"
+  | "haptics"
+  | "lottie"
+  | "video"
+  | "auth"
+  | "actions"
 >;
 
 export function createBuilderV2HostManifest(

@@ -2,16 +2,27 @@ import type {
   BuilderV2ProjectSurface,
   BuilderV2UiIrDocument,
 } from "@onborn/sdk-contracts";
+import { builderV2JourneySteps } from "@onborn/sdk-contracts/builder-v2-journey-steps";
 
 import type { UiIrStateValues } from "./ui-ir-state";
+import { reportedUiIrAnswers } from "./ui-ir-state";
+import { resolveUiIrNextPosition } from "./ui-ir-navigation";
 
 export type UiIrJourneyState = {
   activeScreenId: string;
+  /**
+   * The step the screen stands at, as a progress bar counts steps: the
+   * screens an answer chooses between share one, since a person walks
+   * exactly one of them. Not an index into the screens.
+   */
   position: number;
+  /** How many steps the walk has, counted the same way. */
   total: number;
   surface: BuilderV2ProjectSurface;
   isFirst: boolean;
   isLast: boolean;
+  /** Steps walked from the first screen — what back() unwinds, one per call. */
+  depth: number;
 };
 
 export type UiIrJourneyEvent =
@@ -64,6 +75,11 @@ export function createUiIrJourneyController(input: {
    * than tracked here, so a quiz answer is reported as the user left it.
    */
   readAnswers?: (screenId: string) => UiIrStateValues | undefined;
+  /**
+   * Everything answered so far, by state name — what a screen's routes are
+   * decided against. Absent means every route with a condition is skipped.
+   */
+  readVariables?: () => UiIrStateValues;
 }): UiIrJourneyController {
   /*
    * The journey is the screens someone walks, which is not every screen in the
@@ -118,19 +134,29 @@ export function createUiIrJourneyController(input: {
     );
   }
 
+  // Branch members share a step; see builderV2JourneySteps.
+  const steps = builderV2JourneySteps(screens);
+
   let started = false;
   let terminal = false;
+  /*
+   * The screens the person actually walked through, as positions. Back pops
+   * this rather than stepping to position - 1: a route may have skipped two
+   * outros, and back has to return to where the person came from.
+   */
+  const history: number[] = [];
   const listeners = new Set<(state: UiIrJourneyState) => void>();
 
   const getState = (): UiIrJourneyState => {
     const screen = requiredScreen(screens, position);
     return Object.freeze({
       activeScreenId: screen.screenId,
-      position,
-      total: screens.length,
+      position: steps.stepOf.get(screen.screenId) ?? position,
+      total: steps.total,
       surface: screen.surface,
-      isFirst: position === 0,
+      isFirst: history.length === 0,
       isLast: position === screens.length - 1,
+      depth: history.length,
     });
   };
 
@@ -152,7 +178,12 @@ export function createUiIrJourneyController(input: {
   };
 
   const completedEvent = (screenId: string): UiIrJourneyEvent => {
-    const answers = input.readAnswers?.(screenId);
+    const held = input.readAnswers?.(screenId);
+    const screen = input.document.screens.find(
+      (candidate) => candidate.screenId === screenId,
+    );
+    const answers =
+      held && screen ? reportedUiIrAnswers(screen, held) : held;
     return {
       type: "screen.completed",
       screenId,
@@ -193,7 +224,12 @@ export function createUiIrJourneyController(input: {
       if (terminal) return;
       const current = requiredScreen(screens, position);
       input.onEvent?.(completedEvent(current.screenId));
-      if (position === screens.length - 1) {
+      const target = resolveUiIrNextPosition({
+        screens,
+        position,
+        values: input.readVariables?.() ?? {},
+      });
+      if (target === null) {
         terminal = true;
         input.onEvent?.({
           type: "journey.completed",
@@ -202,13 +238,24 @@ export function createUiIrJourneyController(input: {
         input.onComplete();
         return;
       }
-      position += 1;
+      history.push(position);
+      position = target;
       emitViewed();
       notify();
     },
     back() {
-      if (terminal || position === 0) return;
-      position -= 1;
+      if (terminal || history.length === 0) return;
+      /*
+       * A screen that leaves on its own is not somewhere to return to:
+       * back from the outro lands on the question, not on a loading step
+       * that would fill again and push the person forward again. Skipped
+       * only when there is somewhere earlier to land.
+       */
+      let target = history.pop()!;
+      while (screens[target]?.autoContinue && history.length > 0) {
+        target = history.pop()!;
+      }
+      position = target;
       const screen = requiredScreen(screens, position);
       input.onEvent?.({
         type: "screen.returned",

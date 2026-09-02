@@ -113,6 +113,12 @@ export const BuilderV2InstrumentationManifestSchema = z
     schemaVersion: z.literal(1),
     entryScreenId: InstrumentationIdSchema,
     screens: z.array(BuilderV2InstrumentedScreenSchema).max(1_000),
+    /**
+     * The journey's chrome, when the flow has one. Its nodes and
+     * interactions report under the screen id "chrome": a back control in
+     * the header is pressed on every step, and belongs to none of them.
+     */
+    chrome: z.object({ file: SourcePathSchema }).strict().optional(),
     nodes: z.array(BuilderV2InstrumentedNodeSchema).max(20_000),
     interactions: z.array(BuilderV2InstrumentedInteractionSchema).max(20_000),
   })
@@ -132,9 +138,10 @@ export const BuilderV2InstrumentationManifestSchema = z
       context,
     );
 
-    const screenIds = new Set(
-      manifest.screens.map((screen) => screen.screenId),
-    );
+    const screenIds = new Set([
+      ...manifest.screens.map((screen) => screen.screenId),
+      ...(manifest.chrome ? ["chrome"] : []),
+    ]);
     const placements = new Set<string>();
     manifest.screens.forEach((screen, index) => {
       if (!screen.placement) return;

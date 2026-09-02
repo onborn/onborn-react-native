@@ -174,9 +174,43 @@ const BuilderV2UiIrTimingEnterTransitionSchema = z
   });
 
 export const BuilderV2UiIrEnterTransitionSchema = z.union([
+  /*
+   * Legacy: the React Native Animated idiom, one property list per entrance,
+   * View only, no exit. Still parsed for the artifacts that carry it; new
+   * screens write Reanimated presets, which cover everything this did.
+   */
   BuilderV2UiIrTimingEnterTransitionSchema,
   BuilderV2UiIrReanimatedEnterTransitionSchema,
 ]);
+
+/**
+ * How a screen arrives when the journey moves.
+ *
+ * Named, not described: the runtime knows the direction of travel and picks
+ * the entrance for it — a step forward rises in from below, a step back
+ * fades or slides in from where it came — so the same document reads
+ * naturally both ways. Declared per flow with a per-screen override.
+ */
+export const BuilderV2UiIrScreenTransitionKindSchema = z.enum([
+  "fade-up",
+  "fade",
+  "slide",
+  "none",
+]);
+
+export const BuilderV2UiIrScreenTransitionSchema = z
+  .object({
+    kind: BuilderV2UiIrScreenTransitionKindSchema,
+    durationMs: MotionDurationSchema.optional(),
+  })
+  .strict();
+
+export type BuilderV2UiIrScreenTransitionKind = z.infer<
+  typeof BuilderV2UiIrScreenTransitionKindSchema
+>;
+export type BuilderV2UiIrScreenTransition = z.infer<
+  typeof BuilderV2UiIrScreenTransitionSchema
+>;
 
 export const BuilderV2UiIrExitTransitionSchema =
   BuilderV2UiIrReanimatedExitTransitionSchema;

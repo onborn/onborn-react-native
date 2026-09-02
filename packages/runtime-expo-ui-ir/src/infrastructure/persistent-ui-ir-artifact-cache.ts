@@ -65,6 +65,14 @@ export class PersistentUiIrArtifactCache implements UiIrArtifactCachePort {
     }
   }
 
+  async hasFile(uri: string): Promise<boolean> {
+    try {
+      return await this.options.storage.exists(uri);
+    } catch {
+      return false;
+    }
+  }
+
   async createStage(input: {
     scope: UiIrArtifactCacheScope;
     release: BuilderV2UiIrRelease;

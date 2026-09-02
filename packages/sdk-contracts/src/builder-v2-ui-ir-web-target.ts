@@ -26,6 +26,16 @@ export const BUILDER_V2_UI_IR_WEB_DISPOSITIONS: Readonly<
   text: "renders",
   image: "renders",
   "image-background": "renders",
+  // Drawn with react-native-svg, which renders through react-native-web.
+  "linear-gradient": "renders",
+  // react-native-web's TextInput is an <input>/<textarea>.
+  "text-input": "renders",
+  "journey-progress": "renders",
+  // Drawn with react-native-svg and a JS-driven fill, like the chart.
+  "progress-ring": "renders",
+  // A <video> element, muted and autoplaying, which every browser starts.
+  video: "renders",
+  "screen-slot": "renders",
   pressable: "renders",
   "phosphor-icon": "renders",
   svg: "renders",

@@ -1,6 +1,7 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalEnv": ["ONBORN_LOAD_TRACE"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

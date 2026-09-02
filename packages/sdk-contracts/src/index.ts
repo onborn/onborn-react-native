@@ -10,6 +10,7 @@ export * from "./builder-v2-runtime-events";
 export * from "./builder-v2-runtime-capabilities";
 export * from "./builder-v2-runtime-api-manifest";
 export * from "./builder-v2-native-capabilities";
+export * from "./builder-v2-journey-steps";
 export * from "./builder-v2-project";
 export * from "./builder-v2-project-assets";
 export * from "./builder-v2-google-fonts";

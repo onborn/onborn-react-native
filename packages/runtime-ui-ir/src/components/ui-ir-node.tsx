@@ -31,17 +31,26 @@ import { UiIrAnimatedView } from "./ui-ir-animated-view";
 import { UiIrCarousel } from "./ui-ir-carousel";
 import { UiIrSegmentedControl } from "./ui-ir-segmented-control";
 import { UiIrChart } from "./ui-ir-chart";
+import { UiIrLinearGradient } from "./ui-ir-linear-gradient";
+import { UiIrTextInput } from "./ui-ir-text-input";
+import { UiIrJourneyProgress } from "./ui-ir-journey-progress";
+import { UiIrProgressRing } from "./ui-ir-progress-ring";
+import { UiIrVideo } from "./ui-ir-video";
+import { useUiIrJourneyProgressContext } from "./ui-ir-journey-progress-context";
+import type { UiIrVariables } from "../domain/ui-ir-answers";
 import { UiIrPhosphorIcon } from "./ui-ir-phosphor-icon";
 import { UiIrPressable } from "./ui-ir-pressable";
 import { UiIrVectorNode } from "./ui-ir-vector-node";
 import { uiIrGateHolds } from "../domain/ui-ir-state";
+import { reconcileUiIrYogaAspectRatio } from "../domain/ui-ir-yoga-aspect-ratio";
+import { toReanimatedCssStyle } from "./ui-ir-css-easing";
 import {
   resolveUiIrPlanField,
   uiIrPlanCount,
   type UiIrPlanSnapshot,
 } from "../domain/ui-ir-plans";
 import { UiIrCurrentPlanProvider, useUiIrPlans } from "./ui-ir-plans-context";
-import { useUiIrScreenState } from "./ui-ir-screen-state";
+import { useUiIrScreenState, useUiIrVariables } from "./ui-ir-screen-state";
 
 type UiIrNodeProps = {
   document: BuilderV2UiIrDocument;
@@ -50,15 +59,20 @@ type UiIrNodeProps = {
   locale?: string;
   ports: UiIrRendererPorts;
   assets: ReadonlyMap<string, BuilderV2UiIrAsset>;
+  /** What the chrome's screen-slot renders: the journey's current screen. */
+  renderSlot?: () => ReactElement;
 };
 
 export function UiIrNode(props: UiIrNodeProps): ReactElement | null {
   const screenState = useUiIrScreenState();
   const plans = useUiIrPlans();
+  const variables = useUiIrVariables();
+  const journey = useUiIrJourneyProgressContext();
   const gate = {
     values: screenState.values,
     plans: plans.snapshot,
     currentPlanIndex: plans.currentIndex,
+    ...(journey.gate ? { journey: journey.gate } : {}),
   };
   /*
    * Runtime-dependent appearance, all three slots the dialect has: a node may
@@ -75,10 +89,13 @@ export function UiIrNode(props: UiIrNodeProps): ReactElement | null {
       (merged, variant) => ({ ...merged, ...variant.style }),
       {},
     );
-  const nodeStyle: BuilderV2UiIrStyle | undefined =
-    Object.keys(activeVariantStyle).length > 0
-      ? { ...props.node.style, ...activeVariantStyle }
-      : props.node.style;
+  const nodeStyle: BuilderV2UiIrStyle | undefined = toReanimatedCssStyle(
+    reconcileUiIrYogaAspectRatio(
+      Object.keys(activeVariantStyle).length > 0
+        ? { ...props.node.style, ...activeVariantStyle }
+        : props.node.style,
+    ),
+  );
   const accessibilityState = props.node.accessibilitySelected
     ? {
         accessibilityState: {
@@ -91,6 +108,7 @@ export function UiIrNode(props: UiIrNodeProps): ReactElement | null {
     nodeStyle,
     accessibilityState,
     plans,
+    variables,
   );
   return decorateRenderedUiIrNode(props.ports, {
     screenId: props.screenId,
@@ -106,9 +124,15 @@ function renderNodeElement(
     accessibilityState?: { selected: boolean };
   },
   plans: { snapshot: UiIrPlanSnapshot; currentIndex: number | null },
+  variables: UiIrVariables,
 ): ReactElement {
   const common = {
-    ...createUiIrNodeCommonProps(props.node, props.document, props.locale),
+    ...createUiIrNodeCommonProps(
+      props.node,
+      props.document,
+      props.locale,
+      variables,
+    ),
     ...accessibilityState,
   };
   switch (props.node.type) {
@@ -163,8 +187,52 @@ function renderNodeElement(
     case "text":
       return (
         <Text {...common} style={asTextStyle(nodeStyle)}>
-          {resolveUiIrNodeText(props, props.node.text, plans)}
+          {resolveUiIrNodeText(props, props.node.text, plans, variables)}
         </Text>
+      );
+    case "screen-slot":
+      return props.renderSlot ? (
+        props.renderSlot()
+      ) : (
+        <View {...common} style={SLOT_FILL} />
+      );
+    case "progress-ring":
+      return (
+        <UiIrProgressRing
+          accessibilityLabel={common.accessibilityLabel}
+          color={props.node.color}
+          durationMs={props.node.durationMs}
+          showsPercent={props.node.showsPercent}
+          size={props.node.size}
+          strokeWidth={props.node.strokeWidth}
+          style={asViewStyle(nodeStyle)}
+          textStyle={props.node.textStyle as TextStyle | undefined}
+          trackColor={props.node.trackColor}
+        />
+      );
+    case "journey-progress":
+      return (
+        <UiIrJourneyProgress
+          accessibilityLabel={common.accessibilityLabel}
+          fillStyle={props.node.fillStyle as ViewStyle | undefined}
+          from={props.node.from}
+          style={asViewStyle(nodeStyle)}
+        />
+      );
+    case "text-input":
+      return (
+        <UiIrTextInput
+          accessibilityLabel={common.accessibilityLabel}
+          node={props.node}
+          placeholder={
+            props.node.placeholder
+              ? resolveUiIrNodeText(props, props.node.placeholder, plans, variables)
+              : undefined
+          }
+          ports={props.ports}
+          screenId={props.screenId}
+          style={nodeStyle}
+        />
       );
     case "image":
       return (
@@ -173,6 +241,18 @@ function renderNodeElement(
           source={resolveAsset(props, props.node.assetId)}
           resizeMode={props.node.resizeMode}
           style={asImageStyle(nodeStyle)}
+        />
+      );
+    case "video":
+      return (
+        <UiIrVideo
+          accessibilityLabel={common.accessibilityLabel}
+          host={{ ports: props.ports, screenId: props.screenId, nodeId: props.node.id }}
+          loop={props.node.loop}
+          muted={props.node.muted}
+          resizeMode={props.node.resizeMode}
+          source={resolveAsset(props, props.node.assetId)}
+          style={asViewStyle(nodeStyle)}
         />
       );
     case "image-background":
@@ -185,6 +265,17 @@ function renderNodeElement(
         >
           {renderChildren(props)}
         </ImageBackground>
+      );
+    case "linear-gradient":
+      return (
+        <UiIrLinearGradient
+          accessibilityLabel={common.accessibilityLabel}
+          accessibilityState={accessibilityState.accessibilityState}
+          node={props.node}
+          style={nodeStyle}
+        >
+          {renderChildren(props)}
+        </UiIrLinearGradient>
       );
     case "pressable":
       return (
@@ -344,6 +435,7 @@ function resolveUiIrNodeText(
   props: UiIrNodeProps,
   text: Extract<BuilderV2UiIrNode, { type: "text" }>["text"],
   plans: { snapshot: UiIrPlanSnapshot; currentIndex: number | null },
+  variables: UiIrVariables,
 ): string {
   return text.kind === "billing"
     ? resolveUiIrPlanField(
@@ -352,7 +444,7 @@ function resolveUiIrNodeText(
         text.field,
         plans.currentIndex,
       )
-    : resolveUiIrText(props.document, text, props.locale);
+    : resolveUiIrText(props.document, text, props.locale, variables);
 }
 
 function UiIrSegmentedNode(
@@ -364,6 +456,7 @@ function UiIrSegmentedNode(
   },
 ): ReactElement {
   const screenState = useUiIrScreenState();
+  const variables = useUiIrVariables();
   const selected = screenState.values[props.node.state] ?? null;
   return (
     <UiIrSegmentedControl
@@ -373,7 +466,7 @@ function UiIrSegmentedNode(
       pillStyle={asViewStyle(props.node.pillStyle)}
       segments={props.node.segments.map((segment) => ({
         value: segment.value,
-        label: resolveUiIrNodeText(props, segment.label, props.plans),
+        label: resolveUiIrNodeText(props, segment.label, props.plans, variables),
       }))}
       selected={selected}
       selectedLabelStyle={asTextStyle(props.node.selectedLabelStyle)}
@@ -523,6 +616,8 @@ function asTextStyle(style?: BuilderV2UiIrStyle): TextStyle | undefined {
 function asImageStyle(style?: BuilderV2UiIrStyle): ImageStyle | undefined {
   return style as ImageStyle | undefined;
 }
+
+const SLOT_FILL = { flex: 1 } as const;
 
 function hasCssAnimation(style: unknown): boolean {
   return (

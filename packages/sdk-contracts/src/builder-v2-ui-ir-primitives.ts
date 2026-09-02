@@ -31,6 +31,7 @@ export * from "./builder-v2-ui-ir-billing";
 export * from "./builder-v2-ui-ir-motion";
 export * from "./builder-v2-ui-ir-interaction";
 export * from "./builder-v2-ui-ir-vector";
+export * from "./builder-v2-ui-ir-variables";
 
 const UiIrIdSchema = z
   .string()
@@ -143,6 +144,33 @@ export const BuilderV2UiIrCssAnimationKeysSchema = z
   .partial()
   .passthrough();
 
+/**
+ * A Reanimated CSS transition: the style keys that make a state change move.
+ *
+ * A quiz card's border used to jump from grey to red the instant it was
+ * selected; its press already animated, its selection did not. These keys on
+ * the base style make every later change of the named properties — from a
+ * variant, from a press — interpolate instead. Durations may be numbers
+ * (milliseconds) so they can be read straight from theme.motion.
+ */
+const CssTransitionDurationSchema = z.union([
+  z.number().int().min(0).max(10_000),
+  CssDurationSchema,
+]);
+
+export const BuilderV2UiIrCssTransitionKeysSchema = z
+  .object({
+    transitionProperty: z.union([
+      z.string().min(1).max(60),
+      z.array(z.string().min(1).max(60)).min(1).max(12),
+    ]),
+    transitionDuration: CssTransitionDurationSchema.optional(),
+    transitionDelay: CssTransitionDurationSchema.optional(),
+    transitionTimingFunction: CssTimingFunctionSchema.optional(),
+  })
+  .partial()
+  .passthrough();
+
 export const BuilderV2UiIrStyleSchema = z
   .record(z.string().min(1).max(120), BuilderV2UiIrJsonValueSchema)
   .superRefine((style, context) => {
@@ -151,6 +179,18 @@ export const BuilderV2UiIrStyleSchema = z
         code: z.ZodIssueCode.custom,
         message: "A UI IR style cannot contain more than 160 properties",
       });
+    }
+    if ("transitionProperty" in style) {
+      const parsed = BuilderV2UiIrCssTransitionKeysSchema.safeParse(style);
+      if (!parsed.success) {
+        for (const issue of parsed.error.issues) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: issue.path,
+            message: `CSS transition: ${issue.message}`,
+          });
+        }
+      }
     }
     /*
      * Checked only when the style declares an animation, so every other style
@@ -313,6 +353,23 @@ export const BuilderV2UiIrActionSchema = z.discriminatedUnion("type", [
       capability: z.string().trim().min(1).max(120),
       method: z.string().trim().min(1).max(120),
       input: BuilderV2UiIrJsonValueSchema.optional(),
+      /**
+       * What follows once the host has answered — `await runtime.actions.save()`
+       * and then `runtime.navigation.continue()`. Only navigation: the step
+       * after a host call is a place in the journey, and the button stays
+       * busy until the call settles, so a failed call leaves the person where
+       * they were.
+       */
+      then: z
+        .object({
+          type: z.enum([
+            "navigation.next",
+            "navigation.complete",
+            "navigation.back",
+          ]),
+        })
+        .strict()
+        .optional(),
     })
     .strict(),
 ]);
@@ -366,6 +423,25 @@ export type BuilderV2UiIrNode =
       children: BuilderV2UiIrNode[];
     })
   /*
+   * A colour ramp painted behind its children.
+   *
+   * The fade under the copy of every photographic hero, the tinted canvas of
+   * a welcome — the dialect could name neither, so screens faked them with a
+   * half-transparent View and the review saw a hard band where the reference
+   * had a gradient. The stops are ordinary theme colours (an alpha stop is a
+   * `#RRGGBBAA` custom token), `locations` place them along the axis, and
+   * `start`/`end` are fractions of the box exactly as expo-linear-gradient
+   * reads them, so a screen writes the component it already knows.
+   */
+  | (NodeBase & {
+      type: "linear-gradient";
+      colors: string[];
+      locations?: number[];
+      start?: { x: number; y: number };
+      end?: { x: number; y: number };
+      children: BuilderV2UiIrNode[];
+    })
+  /*
    * A vector animation the artifact carries.
    *
    * `assetId` names an entry in the document's `lottie` list, where the
@@ -405,6 +481,41 @@ export type BuilderV2UiIrNode =
   | (NodeBase & {
       type: "status-bar";
       barStyle?: "default" | "light-content" | "dark-content";
+    })
+  /**
+   * Where the journey's chrome puts the current screen — its `{children}`.
+   * Exactly one per chrome, none anywhere else.
+   */
+  | (NodeBase & { type: "screen-slot" })
+  /*
+   * A field the person types into, bound to one of the screen's states.
+   *
+   * The name question every onboarding opens with had no expression: the
+   * dialect could hold a selection but not free text. The field writes the
+   * state as it is typed, the state travels with the journey's answers, and
+   * `{{state}}` in any later copy reads it back. `submit` is the keyboard's
+   * return key — the same action a Continue button would carry.
+   */
+  | (NodeBase & {
+      type: "text-input";
+      state: string;
+      placeholder?: BuilderV2UiIrText;
+      placeholderTextColor?: string;
+      keyboardType?:
+        | "default"
+        | "email-address"
+        | "numeric"
+        | "phone-pad"
+        | "decimal-pad"
+        | "url";
+      autoCapitalize?: "none" | "sentences" | "words" | "characters";
+      autoCorrect?: boolean;
+      secureTextEntry?: boolean;
+      multiline?: boolean;
+      maxLength?: number;
+      autoFocus?: boolean;
+      returnKeyType?: "done" | "go" | "next" | "send";
+      submit?: BuilderV2UiIrAction;
     })
   | (NodeBase & {
       type: "phosphor-icon";
@@ -539,6 +650,59 @@ export type BuilderV2UiIrNode =
    * The document names the segments and the state they select into; the
    * runtime owns the pill, its measurement and its movement.
    */
+  /**
+   * A progress bar wired to the journey.
+   *
+   * The bar every onboarding step carries was a View with a literal width per
+   * screen — three files to edit when a step moved, and no way to animate
+   * between them because each screen mounts fresh. The runtime knows the
+   * position and the total, and remembers the last value across screens, so
+   * the fill grows from where the previous step left it. `from` is where the
+   * bar starts on the first step (many products open at 20%, not empty).
+   */
+  | (NodeBase & {
+      type: "journey-progress";
+      from?: number;
+      fillStyle?: Record<string, BuilderV2UiIrJsonValue>;
+    })
+  /**
+   * A ring that fills over a fixed time, with the percent counting up.
+   *
+   * The loading step every quiz onboarding has — "analyzing your answers",
+   * a ring, 0% to 100%, and on by itself — needs a timer and a counter, which
+   * a static document cannot express and a screen may not write. The runtime
+   * drives the fill, the count and the orbiting dot over `durationMs`; the
+   * screen that shows it usually leaves on its own (see the screen's
+   * autoContinue), so the two durations are written to match.
+   */
+  /**
+   * A video from the project's assets, playing on its own.
+   *
+   * Muted and autoplaying by default, because that is the only video a
+   * browser will start without a gesture and the only kind an onboarding
+   * wants — a fist bump, a looping product hero — never a player with
+   * controls. The device plays it through the host's lent player; the web
+   * draws a <video>.
+   */
+  | (NodeBase & {
+      type: "video";
+      assetId: string;
+      resizeMode?: "cover" | "contain";
+      /** Loops by default; false plays once and holds the last frame. */
+      loop?: boolean;
+      /** Muted by default; sound needs a gesture the node never gets. */
+      muted?: boolean;
+    })
+  | (NodeBase & {
+      type: "progress-ring";
+      durationMs: number;
+      size?: number;
+      strokeWidth?: number;
+      color: string;
+      trackColor?: string;
+      showsPercent?: boolean;
+      textStyle?: Record<string, BuilderV2UiIrJsonValue>;
+    })
   | (NodeBase & {
       type: "segmented-control";
       /** The screen state the selection is written to, as a slot string. */
@@ -548,6 +712,14 @@ export type BuilderV2UiIrNode =
       labelStyle?: BuilderV2UiIrStyle;
       selectedLabelStyle?: BuilderV2UiIrStyle;
     });
+
+/** A point in the gradient's box, as fractions of its width and height. */
+const GradientPointSchema = z
+  .object({
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+  })
+  .strict();
 
 const CommonNodeSchema = z.object({
   id: UiIrIdSchema,
@@ -613,6 +785,16 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
         children: z.array(BuilderV2UiIrNodeSchema).max(1_000),
       }).strict(),
       CommonNodeSchema.extend({
+        type: z.literal("linear-gradient"),
+        // Two stops make a ramp; past eight it is a picture, not a tint.
+        colors: z.array(z.string().trim().min(1).max(80)).min(2).max(8),
+        // One per colour, 0..1 along the axis; the compiler holds the pairing.
+        locations: z.array(z.number().min(0).max(1)).min(2).max(8).optional(),
+        start: GradientPointSchema.optional(),
+        end: GradientPointSchema.optional(),
+        children: z.array(BuilderV2UiIrNodeSchema).max(1_000),
+      }).strict(),
+      CommonNodeSchema.extend({
         type: z.literal("lottie"),
         assetId: UiIrIdSchema,
         loop: z.boolean(),
@@ -635,6 +817,36 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
         barStyle: z
           .enum(["default", "light-content", "dark-content"])
           .optional(),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("screen-slot"),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("text-input"),
+        state: z.string().trim().min(1).max(80),
+        placeholder: BuilderV2UiIrTextSchema.optional(),
+        placeholderTextColor: z.string().trim().min(1).max(120).optional(),
+        keyboardType: z
+          .enum([
+            "default",
+            "email-address",
+            "numeric",
+            "phone-pad",
+            "decimal-pad",
+            "url",
+          ])
+          .optional(),
+        autoCapitalize: z
+          .enum(["none", "sentences", "words", "characters"])
+          .optional(),
+        autoCorrect: z.boolean().optional(),
+        secureTextEntry: z.boolean().optional(),
+        multiline: z.boolean().optional(),
+        // Long enough for an address, short enough that a field is not a page.
+        maxLength: z.number().int().min(1).max(2_000).optional(),
+        autoFocus: z.boolean().optional(),
+        returnKeyType: z.enum(["done", "go", "next", "send"]).optional(),
+        submit: BuilderV2UiIrActionSchema.optional(),
       }).strict(),
       CommonNodeSchema.extend({
         type: z.literal("phosphor-icon"),
@@ -720,6 +932,30 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
         // past twenty the strip reads as static and the dots as decoration.
         autoAdvanceMs: z.number().int().min(1_000).max(20_000).optional(),
         children: z.array(BuilderV2UiIrNodeSchema).max(24),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("journey-progress"),
+        from: z.number().min(0).max(1).optional(),
+        fillStyle: BuilderV2UiIrStyleSchema.optional(),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("video"),
+        assetId: z.string().trim().min(1).max(160),
+        resizeMode: z.enum(["cover", "contain"]).optional(),
+        loop: z.boolean().optional(),
+        muted: z.boolean().optional(),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("progress-ring"),
+        // Under 200ms nothing is seen filling; past 15s it is a spinner
+        // pretending to be progress.
+        durationMs: z.number().int().min(200).max(15000),
+        size: z.number().finite().positive().max(512).optional(),
+        strokeWidth: z.number().finite().positive().max(64).optional(),
+        color: z.string().trim().min(1).max(120),
+        trackColor: z.string().trim().min(1).max(120).optional(),
+        showsPercent: z.boolean().optional(),
+        textStyle: BuilderV2UiIrStyleSchema.optional(),
       }).strict(),
       CommonNodeSchema.extend({
         type: z.literal("segmented-control"),

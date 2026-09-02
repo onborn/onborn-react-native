@@ -8,6 +8,7 @@ import {
 } from "@onborn/sdk-contracts/builder-v2-ui-ir-runtime";
 
 import { canonicalJson } from "../domain/canonical-json";
+import { createUiIrLoadTrace } from "../domain/ui-ir-load-trace";
 import {
   UiIrArtifactError,
   type UiIrArtifactFailureCode,
@@ -48,7 +49,9 @@ export async function refreshUiIrArtifact(
   },
 ): Promise<RefreshUiIrArtifactResult> {
   const scope = cacheScope(input);
+  const trace = createUiIrLoadTrace(`refresh ${input.flowId.slice(0, 8)}`);
   const lastKnownGood = await dependencies.cache.readActive(scope);
+  trace.mark("read cached state");
   let stageId: string | null = null;
 
   try {
@@ -58,10 +61,12 @@ export async function refreshUiIrArtifact(
         target: input.host.target,
       }),
     );
+    trace.mark("delivery fetched+parsed");
     assertDeliveryScope(delivery, scope, input.host.target);
     assertDeliveryFresh(delivery, dependencies.clock?.now() ?? Date.now());
     assertCompatibility(delivery, input.host);
     await verifyArtifact(delivery, dependencies.crypto);
+    trace.mark("signature verified");
     /*
      * The server just named the release; if it is the one already activated on
      * disk, there is nothing to download. Every mount used to re-fetch every
@@ -77,6 +82,8 @@ export async function refreshUiIrArtifact(
         delivery.artifact.manifest.artifactId &&
       (await cachedArtifactReadsBack(lastKnownGood, dependencies))
     ) {
+      trace.mark("cache-current check");
+      trace.end();
       return {
         artifact: lastKnownGood,
         source: "cache-current",
@@ -84,8 +91,12 @@ export async function refreshUiIrArtifact(
       };
     }
     stageId = await stageDelivery(delivery, scope, dependencies);
+    trace.mark("files downloaded+verified+staged");
+    const activated = await dependencies.cache.activateStage(stageId);
+    trace.mark("stage activated");
+    trace.end();
     return {
-      artifact: await dependencies.cache.activateStage(stageId),
+      artifact: activated,
       source: "network",
       ...(delivery.experiment ? { experiment: delivery.experiment } : {}),
     };
@@ -191,31 +202,35 @@ function assertCachedCompatibility(
 }
 
 /*
- * "Already on disk" is a claim about the past: the files were hash-checked
- * when they were staged, but disk is not immutable — an app update or a
- * partial cleanup can invalidate them. Trusting the claim blindly strands the
- * session, because nothing after the short-circuit downloads and the document
- * loader then fails with no network fallback. Reading the files back is local
- * IO, still far cheaper than the downloads it avoids.
+ * Whether the activated cache still holds what it claims to.
+ *
+ * This used to re-read and re-hash every file on every warm start — hashing
+ * a hero JPEG in pure JS each launch was most of the wait on a flow that had
+ * not changed. Every file was already hash-verified when it was staged, and
+ * the document is hash-verified again by loadCachedUiIrDocument before it is
+ * parsed, so the cheap check is enough here: document files keep the full
+ * read-back, everything else only has to still exist (via the cache's
+ * `hasFile` when it offers one; caches that don't keep the full read-back).
  */
 async function cachedArtifactReadsBack(
   cached: CachedUiIrArtifact,
   dependencies: {
-    cache: Pick<UiIrArtifactCachePort, "readFile">;
+    cache: Pick<UiIrArtifactCachePort, "readFile" | "hasFile">;
     crypto: Pick<UiIrArtifactCryptoPort, "sha256">;
   },
 ): Promise<boolean> {
-  for (const file of cached.files) {
-    const bytes = await dependencies.cache.readFile(file.uri);
-    if (
-      !bytes ||
-      bytes.byteLength !== file.byteLength ||
-      dependencies.crypto.sha256(bytes) !== file.contentHash
-    ) {
-      return false;
+  const checks = cached.files.map(async (file) => {
+    if (file.role !== "document" && dependencies.cache.hasFile) {
+      return dependencies.cache.hasFile(file.uri);
     }
-  }
-  return true;
+    const bytes = await dependencies.cache.readFile(file.uri);
+    return (
+      bytes !== null &&
+      bytes.byteLength === file.byteLength &&
+      (await dependencies.crypto.sha256(bytes)) === file.contentHash
+    );
+  });
+  return (await Promise.all(checks)).every(Boolean);
 }
 
 async function verifyArtifact(
@@ -223,14 +238,14 @@ async function verifyArtifact(
   crypto: UiIrArtifactCryptoPort,
 ): Promise<void> {
   const { artifactId, ...identity } = delivery.artifact.manifest;
-  if (crypto.sha256(canonicalJson(identity)) !== artifactId) {
+  if ((await crypto.sha256(canonicalJson(identity))) !== artifactId) {
     throw new UiIrArtifactError(
       "manifest_integrity_failed",
       "Builder V2 UI IR artifact identity hash is invalid.",
     );
   }
   const { manifest, signature } = delivery.artifact;
-  const manifestHash = crypto.sha256(canonicalJson(manifest));
+  const manifestHash = await crypto.sha256(canonicalJson(manifest));
   if (signature.manifestHash !== manifestHash) {
     throw new UiIrArtifactError(
       "manifest_integrity_failed",
@@ -272,19 +287,27 @@ async function stageDelivery(
     artifact: delivery.artifact,
   });
   try {
-    for (const file of delivery.files) {
-      const bytes = await downloadFile(file, dependencies);
-      await dependencies.cache.writeStageFile({
-        stageId,
-        file: {
-          path: file.path,
-          role: file.role,
-          contentHash: file.contentHash,
-          byteLength: file.byteLength,
-        },
-        bytes,
-      });
-    }
+    /*
+     * All files at once. Downloading sequentially paid a full network round
+     * trip per file — document, hero image, every font — which was most of a
+     * cold start. Verification stays per-file inside downloadFile, and the
+     * cache serializes its own writes.
+     */
+    await Promise.all(
+      delivery.files.map(async (file) => {
+        const bytes = await downloadFile(file, dependencies);
+        await dependencies.cache.writeStageFile({
+          stageId,
+          file: {
+            path: file.path,
+            role: file.role,
+            contentHash: file.contentHash,
+            byteLength: file.byteLength,
+          },
+          bytes,
+        });
+      }),
+    );
     return stageId;
   } catch (error) {
     await dependencies.cache.discardStage(stageId).catch(() => undefined);
@@ -301,7 +324,12 @@ async function downloadFile(
 ): Promise<Uint8Array> {
   let bytes: Uint8Array;
   try {
-    bytes = await dependencies.delivery.downloadFile(file.url);
+    // The delivery may carry small critical files inline (the document);
+    // those bytes skip the network entirely and still face the same hash
+    // check below — where they came from proves nothing, the hash does.
+    bytes = file.contents
+      ? base64ToBytes(file.contents)
+      : await dependencies.delivery.downloadFile(file.url);
   } catch (error) {
     throw new UiIrArtifactError(
       "download_failed",
@@ -311,12 +339,21 @@ async function downloadFile(
   }
   if (
     bytes.byteLength !== file.byteLength ||
-    dependencies.crypto.sha256(bytes) !== file.contentHash
+    (await dependencies.crypto.sha256(bytes)) !== file.contentHash
   ) {
     throw new UiIrArtifactError(
       "file_integrity_failed",
       `UI IR file "${file.path}" failed integrity validation.`,
     );
+  }
+  return bytes;
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
 }

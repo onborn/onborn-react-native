@@ -41,13 +41,24 @@ export function UiIrSegmentedControl(props: {
   const position = useRef(new Animated.Value(0)).current;
   const count = Math.max(props.segments.length, 1);
   const segmentWidth = trackWidth / count;
-  const selectedIndex = Math.max(
-    0,
-    props.segments.findIndex((segment) => segment.value === props.selected),
+  /*
+   * Nothing selected draws no pill: a gender switcher that opened with "Man"
+   * highlighted while Continue waited for an answer read as a choice already
+   * made. The pill appears on the first selection, sliding from the segment
+   * it lands on rather than from the left edge.
+   */
+  const foundIndex = props.segments.findIndex(
+    (segment) => segment.value === props.selected,
   );
+  const hasSelection = foundIndex >= 0;
+  const selectedIndex = Math.max(0, foundIndex);
 
   useEffect(() => {
     if (segmentWidth <= 0) return;
+    if (!hasSelection) {
+      position.setValue(selectedIndex * segmentWidth);
+      return;
+    }
     Animated.timing(position, {
       toValue: selectedIndex * segmentWidth,
       duration: 220,
@@ -56,7 +67,7 @@ export function UiIrSegmentedControl(props: {
       // at best; a 220ms JS-driven transform is indistinguishable by eye.
       useNativeDriver: false,
     }).start();
-  }, [position, segmentWidth, selectedIndex]);
+  }, [hasSelection, position, segmentWidth, selectedIndex]);
 
   const onTrackLayout = (event: LayoutChangeEvent) => {
     setTrackWidth(event.nativeEvent.layout.width);
@@ -71,7 +82,7 @@ export function UiIrSegmentedControl(props: {
       style={props.style}
     >
       <View onLayout={onTrackLayout} style={styles.track}>
-        {segmentWidth > 0 ? (
+        {segmentWidth > 0 && hasSelection ? (
           <Animated.View
             style={[
               styles.pill,

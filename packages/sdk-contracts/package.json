@@ -53,6 +53,10 @@
       "types": "./dist/builder-v2-native-capabilities.d.ts",
       "default": "./dist/builder-v2-native-capabilities.js"
     },
+    "./builder-v2-journey-steps": {
+      "types": "./dist/builder-v2-journey-steps.d.ts",
+      "default": "./dist/builder-v2-journey-steps.js"
+    },
     "./builder-v2-project": {
       "types": "./dist/builder-v2-project.d.ts",
       "default": "./dist/builder-v2-project.js"

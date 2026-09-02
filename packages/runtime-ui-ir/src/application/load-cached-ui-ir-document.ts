@@ -25,7 +25,7 @@ export async function loadCachedUiIrDocument(
   if (
     !bytes ||
     bytes.byteLength !== file.byteLength ||
-    dependencies.crypto.sha256(bytes) !== file.contentHash
+    (await dependencies.crypto.sha256(bytes)) !== file.contentHash
   ) {
     throw documentError(`Cached UI IR document "${path}" is corrupted.`);
   }

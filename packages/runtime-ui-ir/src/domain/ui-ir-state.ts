@@ -1,5 +1,6 @@
 import type {
   BuilderV2UiIrCondition,
+  BuilderV2UiIrJourneyCondition,
   BuilderV2UiIrScreen,
   BuilderV2UiIrStateCondition,
 } from "@onborn/sdk-contracts/builder-v2-ui-ir";
@@ -17,6 +18,30 @@ export function initialUiIrStateValues(
 ): UiIrStateValues {
   return Object.fromEntries(
     Object.entries(screen.state ?? {}).map(([name, s]) => [name, s.initial]),
+  );
+}
+
+/**
+ * A screen's values as they may leave the device.
+ *
+ * A selection is one of a few known options and is reported as it is. Free
+ * text is a person's own words — usually their name — so it is reported as
+ * "provided" (or null when empty) unless the field asked for the value to be
+ * reported. The document made this decision at publish time; here it is only
+ * applied.
+ */
+export function reportedUiIrAnswers(
+  screen: Pick<BuilderV2UiIrScreen, "state">,
+  values: UiIrStateValues,
+): UiIrStateValues {
+  return Object.fromEntries(
+    Object.entries(values).map(([name, value]) => {
+      const declaration = screen.state?.[name];
+      if (!declaration?.text || declaration.text.report === "value") {
+        return [name, value];
+      }
+      return [name, value && value.trim() !== "" ? "provided" : null];
+    }),
   );
 }
 
@@ -47,8 +72,13 @@ export function uiIrGateHolds(
     values: UiIrStateValues;
     plans: UiIrPlanSnapshot;
     currentPlanIndex: number | null;
+    /** Where the journey stands; absent outside a journey (a bare screen). */
+    journey?: UiIrJourneyGate;
   },
 ): boolean {
+  if ("journey" in condition) {
+    return uiIrJourneyConditionHolds(context.journey, condition);
+  }
   return "state" in condition
     ? uiIrConditionHolds(context.values, condition)
     : uiIrPlanConditionHolds(
@@ -56,4 +86,27 @@ export function uiIrGateHolds(
         condition,
         context.currentPlanIndex,
       );
+}
+
+export type UiIrJourneyGate = {
+  isFirst: boolean;
+  isLast: boolean;
+  /** The chrome variant the active screen asked for, or null. */
+  variant: string | null;
+};
+
+/**
+ * The chrome's predicates. Outside a journey nothing is first or last and
+ * there is no variant, so a condition reads as not holding — the back
+ * control a chrome hides on the first screen stays hidden on a bare render.
+ */
+export function uiIrJourneyConditionHolds(
+  journey: UiIrJourneyGate | undefined,
+  condition: BuilderV2UiIrJourneyCondition,
+): boolean {
+  const holds =
+    condition.journey === "variant"
+      ? (journey?.variant ?? null) === (condition.equals ?? null)
+      : (journey?.[condition.journey] ?? false);
+  return condition.negate ? !holds : holds;
 }

@@ -14,6 +14,12 @@ export type UiIrActionContext = {
   nodeId: string;
   action: BuilderV2UiIrAction;
   /**
+   * What the journey has collected so far, by state name — handed to the
+   * app's own handlers so `saveProfile` can read the answers without the
+   * screen spelling them out in the call.
+   */
+  answers?: Readonly<Record<string, string>>;
+  /**
    * Turns the plan an artifact names into the product the store sells.
    *
    * Supplied by the pressable, which is the only place that knows both the

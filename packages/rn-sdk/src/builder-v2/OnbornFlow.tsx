@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useMemo,
   useRef,
   useState,
@@ -7,6 +8,10 @@ import {
   type ReactNode,
 } from "react";
 import { Platform } from "react-native";
+import {
+  SafeAreaInsetsContext,
+  SafeAreaProvider,
+} from "react-native-safe-area-context";
 
 import {
   createBuilderV2UiIrAnalyticsBridge,
@@ -22,6 +27,7 @@ import {
   ExpoUiIrRemoteFlow,
   PersistentUiIrArtifactCache,
   type ExpoUiIrAnalyticsFactory,
+  type ExpoUiIrRuntimeSession,
   type ExpoUiIrRuntimeSessionDependencies,
 } from "@onborn/runtime-expo-ui-ir";
 import {
@@ -29,12 +35,12 @@ import {
   HttpUiIrArtifactDelivery,
   HttpUiIrRuntimeControl,
   HttpUiIrRuntimeDiagnostics,
-  NobleUiIrArtifactCrypto,
 } from "@onborn/runtime-ui-ir/artifact";
 import type { CustomerEntitlement } from "@onborn/sdk-contracts";
 
 import { resolveOnbornRuntimeConfig } from "../config/Onborn";
 import { createBuilderV2BillingPort } from "./billing-port";
+import { ExpoCryptoUiIrArtifactCrypto } from "./expo-crypto-ui-ir-artifact-crypto";
 import { createBuilderV2PlanSnapshot } from "./plan-snapshot";
 import {
   createOnbornCapabilityPort,
@@ -42,6 +48,7 @@ import {
   type OnbornHostCapabilities,
 } from "./host-capabilities";
 import { OnbornLottie } from "./OnbornLottie";
+import { OnbornVideo } from "./OnbornVideo";
 import type { BuilderV2HostCapability } from "./runtime-manifest";
 import { readUiIrOfferingKey } from "@onborn/runtime-ui-ir";
 import {
@@ -53,6 +60,7 @@ import { createBuilderV2HostManifest } from "./runtime-manifest";
 import { createBuilderV2RuntimeId } from "./runtime-id";
 import { BUILDER_V2_TRUSTED_UI_IR_KEYS } from "./trusted-ui-ir-keys";
 import { phosphorUiIrIconRegistry } from "@onborn/runtime-ui-ir/phosphor";
+import type { ExpoUiIrJourneyHostEvent } from "@onborn/runtime-expo-ui-ir";
 
 export type OnbornFlowProps = {
   flowId: string;
@@ -61,6 +69,13 @@ export type OnbornFlowProps = {
   onComplete?: () => void;
   onDismiss?: () => void;
   onEntitlementsChanged?: (entitlements: CustomerEntitlement[]) => void;
+  /**
+   * The journey as it happens: every screen viewed, completed or returned
+   * to, the journey finishing, and every custom event a screen tracks — each
+   * with what has been answered so far. Fetch what a step needs when it is
+   * viewed, save the profile when the journey completes, react to a button.
+   */
+  onEvent?: (event: OnbornFlowEvent) => void;
   renderLoading?: () => ReactNode;
   renderError?: (error: Error, retry: () => void) => ReactNode;
   /**
@@ -178,31 +193,59 @@ export function OnbornUiIrPresentation(
     capabilities: props.capabilities,
   });
 
+  // Stable across renders: an inline callback used to hand the remote flow a
+  // fresh identity every render, and identity churn during a cold load is
+  // exactly what restarted the session per render.
+  const handleSessionReady = useCallback(
+    (session: ExpoUiIrRuntimeSession) => {
+      // A standalone paywall may sell an offering of its own, so which one to
+      // load depends on what is being presented, not on the document alone.
+      setOfferingKey(
+        readUiIrOfferingKey(
+          session.document,
+          props.placement ? { placement: props.placement } : undefined,
+        ),
+      );
+    },
+    [props.placement],
+  );
+
   return (
+    <EnsureSafeAreaInsets>
     <ExpoUiIrRemoteFlow
       input={input}
       dependencies={dependencies}
       locale={props.locale ?? config.locale}
       plans={plans}
-      onSessionReady={(session) => {
-        // A standalone paywall may sell an offering of its own, so which one to
-        // load depends on what is being presented, not on the document alone.
-        setOfferingKey(
-          readUiIrOfferingKey(
-            session.document,
-            props.placement ? { placement: props.placement } : undefined,
-          ),
-        );
-      }}
+      onSessionReady={handleSessionReady}
       renderLoading={props.renderLoading}
       renderError={props.renderError}
     />
+    </EnsureSafeAreaInsets>
   );
 }
 
+/**
+ * Guarantees the renderer can read the device's safe-area insets.
+ *
+ * The runtime pads plain content screens away from the notch and home
+ * indicator, which needs a SafeAreaProvider somewhere above it. Expo Router
+ * apps already have one — reuse it rather than nesting a second measurement
+ * pass; a bare React Native host gets one from the SDK itself.
+ */
+function EnsureSafeAreaInsets({ children }: { children: ReactNode }) {
+  const inherited = useContext(SafeAreaInsetsContext);
+  if (inherited) {
+    return <>{children}</>;
+  }
+  return <SafeAreaProvider>{children}</SafeAreaProvider>;
+}
+
+export type OnbornFlowEvent = ExpoUiIrJourneyHostEvent;
+
 type LatestCallbacks = Pick<
   OnbornFlowProps,
-  "onComplete" | "onDismiss" | "onEntitlementsChanged"
+  "onComplete" | "onDismiss" | "onEntitlementsChanged" | "onEvent"
 >;
 
 function useLatestCallbacks(props: LatestCallbacks) {
@@ -236,7 +279,7 @@ function useRuntimeDependencies(input: {
     [storage],
   );
   const crypto = useMemo(
-    () => new NobleUiIrArtifactCrypto(BUILDER_V2_TRUSTED_UI_IR_KEYS),
+    () => new ExpoCryptoUiIrArtifactCrypto(BUILDER_V2_TRUSTED_UI_IR_KEYS),
     [],
   );
   const delivery = useMemo(
@@ -288,11 +331,16 @@ function useRuntimeDependencies(input: {
     () => input.callbacks.current.onDismiss?.(),
     [input.callbacks],
   );
+  const onJourneyEvent = useCallback(
+    (event: OnbornFlowEvent) => input.callbacks.current.onEvent?.(event),
+    [input.callbacks],
+  );
 
   const capabilities = useMemo(
     () =>
       createOnbornCapabilityPort(input.capabilities, {
         lottie: (props) => <OnbornLottie {...props} />,
+        video: (props) => <OnbornVideo {...props} />,
       }),
     [input.capabilities],
   );
@@ -312,6 +360,7 @@ function useRuntimeDependencies(input: {
       ...(createAnalytics ? { createAnalytics } : {}),
       onComplete,
       onDismiss,
+      onJourneyEvent,
     }),
     [
       billing,
@@ -324,6 +373,7 @@ function useRuntimeDependencies(input: {
       diagnostics,
       onComplete,
       onDismiss,
+      onJourneyEvent,
     ],
   );
 }

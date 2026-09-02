@@ -16,6 +16,11 @@ import {
   type BuilderV2RuntimeLottieView,
   type OnbornLottieRenderProps,
 } from "./lottie-capability";
+import {
+  readVideoRenderProps,
+  type BuilderV2RuntimeVideo,
+  type OnbornVideoRenderProps,
+} from "./video-capability";
 
 /**
  * The native capabilities an app lends to a published flow.
@@ -53,7 +58,37 @@ export type OnbornHostCapabilities = {
    * is the app's to provide, for the same reason the camera is.
    */
   lottie?: BuilderV2RuntimeLottie;
+  /**
+   * The video player, for flows whose screens play a clip.
+   *
+   * `import { VideoView, useVideoPlayer } from "expo-video"` and lend both
+   * here. The clips travel inside the artifact like images; only the native
+   * player is the app's to provide, for the same reason the Lottie player is.
+   */
+  video?: BuilderV2RuntimeVideo;
+  /**
+   * The app's own handlers, by the names the flow's manifest declares.
+   *
+   * A screen calls `await runtime.actions.saveProfile({ goal })`; this is
+   * what answers. The handler gets the input the screen wrote and the
+   * journey's answers so far, and the button that made the call stays busy
+   * until the promise settles — a rejection leaves the person on the screen,
+   * with the app's own error handling (a toast, a retry) in charge.
+   */
+  actions?: Readonly<Record<string, OnbornHostAction>>;
 };
+
+export type OnbornHostActionContext = {
+  screenId: string;
+  nodeId: string;
+  /** Everything the journey has collected so far, by state name. */
+  answers: Readonly<Record<string, string>>;
+};
+
+export type OnbornHostAction = (
+  input: BuilderV2UiIrJsonValue | undefined,
+  context: OnbornHostActionContext,
+) => Promise<void> | void;
 
 /**
  * One table rather than a branch per capability.
@@ -67,8 +102,16 @@ const CAPABILITY_METHODS: {
     implementation: NonNullable<OnbornHostCapabilities[K]>,
     method: string,
     input: BuilderV2UiIrJsonValue | undefined,
+    context: OnbornHostActionContext,
   ) => Promise<unknown> | undefined;
 } = {
+  // The method IS the handler's name; the app named it in the manifest.
+  actions: (actions, method, input, context) => {
+    const handler = Object.prototype.hasOwnProperty.call(actions, method)
+      ? actions[method]
+      : undefined;
+    return handler ? Promise.resolve(handler(input, context)) : undefined;
+  },
   notifications: (notifications, method, input) => {
     if (method === "requestPermission")
       return notifications.requestPermission();
@@ -95,8 +138,9 @@ const CAPABILITY_METHODS: {
     if (method !== "trigger") return undefined;
     return haptics.trigger(readHapticStyle(input));
   },
-  // A component, not a method: rendered below, never invoked.
+  // Components, not methods: rendered below, never invoked.
   lottie: () => undefined,
+  video: () => undefined,
 };
 
 export function hostCapabilityNames(
@@ -105,6 +149,16 @@ export function hostCapabilityNames(
   return (Object.keys(CAPABILITY_METHODS) as BuilderV2HostCapability[]).filter(
     (name) => Boolean(capabilities?.[name as keyof OnbornHostCapabilities]),
   );
+}
+
+/**
+ * Every capability a host COULD lend — for surfaces that only need the
+ * compatibility gate to pass, never an implementation. The prefetcher claims
+ * them all so a flow requiring, say, haptics still warms the cache; the real
+ * mount re-checks against what the app actually lent.
+ */
+export function allHostCapabilityNames(): BuilderV2HostCapability[] {
+  return Object.keys(CAPABILITY_METHODS) as BuilderV2HostCapability[];
 }
 
 /**
@@ -125,6 +179,9 @@ export function hostCapabilityNames(
 export type OnbornCapabilityRenderers = {
   lottie: (
     props: OnbornLottieRenderProps & { LottieView: BuilderV2RuntimeLottieView },
+  ) => ReactNode;
+  video: (
+    props: OnbornVideoRenderProps & { video: BuilderV2RuntimeVideo },
   ) => ReactNode;
 };
 
@@ -147,6 +204,11 @@ export function createOnbornCapabilityPort(
         implementation as never,
         invocation.method,
         invocation.input,
+        {
+          screenId: invocation.screenId,
+          nodeId: invocation.nodeId,
+          answers: invocation.answers ?? {},
+        },
       );
       if (result === undefined) {
         // Silence here would read as a permission granted or a haptic fired,
@@ -168,6 +230,18 @@ export function createOnbornCapabilityPort(
         return renderers.lottie({
           ...readLottieRenderProps(input.props),
           LottieView: lottie.LottieView,
+        });
+      }
+      if (input.capability === "video") {
+        const video = capabilities?.video;
+        if (!video) {
+          throw new Error(
+            'This app did not lend a video player. Pass capabilities={{ video: { VideoView, useVideoPlayer } }} with both from "expo-video".',
+          );
+        }
+        return renderers.video({
+          ...readVideoRenderProps(input.props),
+          video,
         });
       }
       /*

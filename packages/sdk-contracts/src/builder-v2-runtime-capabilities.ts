@@ -1,4 +1,5 @@
 import type { BuilderV2ProjectSurface } from "./builder-v2-project";
+import type { BuilderV2UiIrJsonValue } from "./builder-v2-ui-ir-primitives";
 
 export const BUILDER_V2_RUNTIME_CAPABILITIES_VERSION = 1 as const;
 
@@ -312,15 +313,39 @@ export type BuilderV2RuntimeCapabilities = {
   readonly haptics?: BuilderV2RuntimeHaptics;
   readonly notifications?: BuilderV2RuntimeNotifications;
   readonly storeReview?: BuilderV2RuntimeStoreReview;
+  /**
+   * The app's own handlers, by the names the project manifest declares:
+   * `await runtime.actions.saveProfile({ goal })`. Each resolves when the app
+   * has answered; a button that awaits one before navigating stays busy until
+   * then. Present only when the app lent `actions={{ … }}`.
+   */
+  readonly actions?: BuilderV2RuntimeActions;
+};
+
+export type BuilderV2RuntimeActions = {
+  readonly [name: string]: (input?: BuilderV2UiIrJsonValue) => Promise<void>;
 };
 
 export type BuilderV2RuntimeJourneyState = {
   readonly activeScreenId: string;
+  /**
+   * The step this screen stands at, from 0, as a progress bar counts steps:
+   * the screens an answer chooses between share one step, because a person
+   * walks exactly one of them. See builderV2JourneySteps.
+   */
   readonly position: number;
+  /** How many steps the walk has, counted the same way. */
   readonly total: number;
   readonly surface: BuilderV2ProjectSurface;
   readonly isFirst: boolean;
   readonly isLast: boolean;
+  /**
+   * What earlier screens collected, by state name — `journey.answers.name`
+   * is the name typed two screens ago. In a screen's source it reads as a
+   * string; the compiler turns it into a `{{name}}` placeholder the runtime
+   * fills, so the artifact stays static. Empty for anything not answered.
+   */
+  readonly answers: Readonly<Record<string, string>>;
 };
 
 export type BuilderV2RemoteFlowProps = {

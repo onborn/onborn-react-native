@@ -4,6 +4,7 @@ export * from "./application/create-expo-ui-ir-runtime-session";
 export * from "./components/expo-ui-ir-flow";
 export * from "./components/expo-ui-ir-remote-flow";
 export * from "./infrastructure/expo-file-system-ui-ir-storage";
+export * from "./infrastructure/expo-font-ui-ir-font-loader";
 export * from "./infrastructure/persistent-ui-ir-artifact-cache";
 export * from "./ports/expo-ui-ir-runtime";
 export * from "./ports/persistent-ui-ir-storage";

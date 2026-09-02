@@ -7,7 +7,7 @@ import {
 } from "./host-capabilities";
 
 /** A renderer that draws nothing; these tests are about promises, not pixels. */
-const RENDERERS = { lottie: () => null };
+const RENDERERS = { lottie: () => null, video: () => null };
 
 /*
  * The manifest is a promise. An app that never lent a notifications
@@ -243,4 +243,54 @@ test("lent auth callbacks are promised and routed", async () => {
   });
 
   assert.deepEqual(calls, ["signIn"]);
+});
+
+/*
+ * The video player is lent the way the Lottie player is. A screen playing a
+ * clip compiles to a "video" requirement; a host that lent nothing is judged
+ * incompatible up front, and one that lent expo-video plays the file the
+ * runtime staged from the artifact.
+ */
+test("a lent video player is promised and renders the node through the port", () => {
+  const VideoView = () => null;
+  const useVideoPlayer = () => ({ loop: true, muted: true, play() {}, pause() {} });
+  const capabilities = { video: { VideoView, useVideoPlayer } };
+  const rendered: unknown[] = [];
+
+  assert.deepEqual(hostCapabilityNames(capabilities), ["video"]);
+  const port = createOnbornCapabilityPort(capabilities, {
+    lottie: () => null,
+    video: (props) => {
+      rendered.push(props);
+      return null;
+    },
+  });
+  port?.render({
+    screenId: "thankYou",
+    nodeId: "clip",
+    capability: "video",
+    component: "VideoView",
+    props: { uri: "file:///cache/clip.mp4", loop: false, resizeMode: "contain" },
+  });
+
+  assert.deepEqual(rendered, [
+    {
+      video: capabilities.video,
+      uri: "file:///cache/clip.mp4",
+      loop: false,
+      muted: true,
+      resizeMode: "contain",
+    },
+  ]);
+  assert.throws(
+    () =>
+      createOnbornCapabilityPort({ lottie: { LottieView: () => null } }, RENDERERS)?.render({
+        screenId: "thankYou",
+        nodeId: "clip",
+        capability: "video",
+        component: "VideoView",
+        props: { uri: "file:///cache/clip.mp4" },
+      }),
+    /did not lend a video player/,
+  );
 });

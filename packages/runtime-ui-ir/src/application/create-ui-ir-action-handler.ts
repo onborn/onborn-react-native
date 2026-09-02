@@ -73,7 +73,18 @@ export function createUiIrActionHandler(
           ...(action.input !== undefined ? { input: action.input } : {}),
           screenId: context.screenId,
           nodeId: context.nodeId,
+          ...(context.answers ? { answers: context.answers } : {}),
         });
+        /*
+         * The step after the host has answered. Reached only when the call
+         * settled: a rejection above leaves the person where they were, with
+         * the app's own error handling in charge.
+         */
+        if (action.then?.type === "navigation.next") ports.journey.next();
+        else if (action.then?.type === "navigation.back") ports.journey.back();
+        else if (action.then?.type === "navigation.complete") {
+          ports.journey.complete();
+        }
     }
   };
 }

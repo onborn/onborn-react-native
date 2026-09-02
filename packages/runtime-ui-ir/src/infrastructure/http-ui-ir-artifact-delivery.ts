@@ -47,6 +47,9 @@ export class HttpUiIrArtifactDelivery implements UiIrArtifactDeliveryPort {
     // This client's schema knows the experiment field, so it always asks for
     // the assignment stamp; servers ignore the flag when nothing is running.
     url.searchParams.set("assignment", "1");
+    // And for the document to ride inside the response: one storage round
+    // trip fewer on the critical path, same hash verification either way.
+    url.searchParams.set("inline", "1");
     const response = await fetchImpl(url.toString(), {
       headers: { Authorization: `Bearer ${this.config.apiKey}` },
     });

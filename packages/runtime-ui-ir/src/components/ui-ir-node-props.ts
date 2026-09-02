@@ -19,6 +19,7 @@ export function createUiIrNodeCommonProps(
   node: BuilderV2UiIrNode,
   document: BuilderV2UiIrDocument,
   locale?: string,
+  variables: Readonly<Record<string, string>> = {},
 ): UiIrNodeCommonProps {
   if (!node.accessibilityLabel) return {};
   return {
@@ -26,6 +27,7 @@ export function createUiIrNodeCommonProps(
       document,
       node.accessibilityLabel,
       locale,
+      variables,
     ),
   };
 }

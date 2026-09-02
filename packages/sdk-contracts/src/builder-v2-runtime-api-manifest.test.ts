@@ -13,6 +13,7 @@ test("runtime API manifest documents every supported capability group", () => {
     "camera",
     "haptics",
     "notifications",
+    "actions",
     "storeReview",
   ]);
   assert.deepEqual(

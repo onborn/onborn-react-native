@@ -32,6 +32,8 @@ export type UiIrActionRuntimePorts = {
       input?: BuilderV2UiIrJsonValue;
       screenId: string;
       nodeId: string;
+      /** The journey's answers so far, for the app's own handlers. */
+      answers?: Readonly<Record<string, string>>;
     }): void | Promise<void>;
   };
   /** Opens the terms and privacy documents a paywall is required to link. */

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -34,14 +34,29 @@ export function ExpoUiIrRemoteFlow(
     status: "loading",
   });
 
+  /*
+   * The session restarts only when WHAT to load changes — the input (flow,
+   * environment, host, placement) or an explicit retry. Dependencies and the
+   * ready callback ride in refs: hosts hand both in with fresh identities on
+   * every render (an inline `capabilities` object, an inline callback), and
+   * keying the effect on them started a brand-new session per parent render.
+   * During a cold load the offering hook re-renders the host several times,
+   * so one mount kicked off four full downloads racing each other — the
+   * "cancelled" flag only ignores results, it does not stop the network.
+   */
+  const dependenciesRef = useRef(props.dependencies);
+  dependenciesRef.current = props.dependencies;
+  const onSessionReadyRef = useRef(props.onSessionReady);
+  onSessionReadyRef.current = props.onSessionReady;
+
   useEffect(() => {
     let cancelled = false;
     setState({ status: "loading" });
-    void createExpoUiIrRuntimeSession(props.input, props.dependencies)
+    void createExpoUiIrRuntimeSession(props.input, dependenciesRef.current)
       .then((session) => {
         if (cancelled) return;
         setState({ status: "ready", session });
-        props.onSessionReady?.(session);
+        onSessionReadyRef.current?.(session);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -50,7 +65,7 @@ export function ExpoUiIrRemoteFlow(
     return () => {
       cancelled = true;
     };
-  }, [attempt, props.dependencies, props.input, props.onSessionReady]);
+  }, [attempt, props.input]);
 
   if (state.status === "loading") {
     return (
