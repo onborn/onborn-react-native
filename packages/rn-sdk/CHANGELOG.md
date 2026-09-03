@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0-beta.2
+
+- Rebuilt against runtime-ui-ir 0.7.0-beta.2, runtime-expo-ui-ir 0.7.0-beta.2 and billing 0.7.0-beta.2 (RulerPicker inert on the builder canvas).
+
 ## 0.8.0-beta.1
 
 - Built-in capabilities: `expo-haptics` and `expo-video` ship with the SDK, so a flow that plays a clip or taps on a picker reaches every app carrying the SDK without an app release. Lottie is picked up automatically when `lottie-react-native` is installed. Capabilities lent through the `capabilities` prop still win.

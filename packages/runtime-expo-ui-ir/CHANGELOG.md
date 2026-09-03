@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0-beta.2
+
+- Rebuilt against runtime-ui-ir 0.7.0-beta.2.
+
 ## 0.7.0-beta.1
 
 - Rebuilt against runtime-ui-ir 0.7.0-beta.1.

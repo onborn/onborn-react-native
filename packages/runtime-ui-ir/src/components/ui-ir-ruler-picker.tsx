@@ -25,6 +25,7 @@ import {
   uiIrRulerStepCount,
   uiIrRulerValueAt,
 } from "../domain/ui-ir-ruler";
+import { useUiIrPreviewEditing } from "./use-ui-ir-preview-editing";
 
 const ITEM_WIDTH = 12;
 const TICK_WIDTH = 1.5;
@@ -117,6 +118,13 @@ export function UiIrRulerPicker(props: {
   );
   const indexRef = useRef(index);
   const list = useRef<FlatList<Tick>>(null);
+  /*
+   * Inert on the builder canvas. The same drag that pans the canvas or picks
+   * a tick to restyle scrolled the ruler instead, and the reading changed
+   * under someone who had not asked for it. The strip still takes its
+   * programmatic placement; only the finger is ignored.
+   */
+  const editing = useUiIrPreviewEditing();
   const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
   /*
    * Whether the strip has been put on its reading. Until then nothing it
@@ -324,6 +332,7 @@ export function UiIrRulerPicker(props: {
             overScrollMode="never"
             ref={list}
             renderItem={renderTick}
+            scrollEnabled={!editing}
             scrollEventThrottle={16}
             showsHorizontalScrollIndicator={false}
             snapToAlignment="start"
