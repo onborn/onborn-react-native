@@ -17,7 +17,18 @@ export function useUiIrPreviewEditing(): boolean {
 }
 
 function subscribe(onChange: () => void): () => void {
-  if (typeof window === "undefined") return () => undefined;
+  /*
+   * A device is not an editor and has no event to hear. Hermes defines
+   * `window` as an alias of the global, so "is it defined" is not the test —
+   * a ruler on an iPhone crashed with "undefined is not a function" on the
+   * listener call. The listener itself is what has to exist.
+   */
+  if (
+    typeof window === "undefined" ||
+    typeof window.addEventListener !== "function"
+  ) {
+    return () => undefined;
+  }
   window.addEventListener(UI_IR_PREVIEW_MODE_EVENT, onChange);
   return () => window.removeEventListener(UI_IR_PREVIEW_MODE_EVENT, onChange);
 }

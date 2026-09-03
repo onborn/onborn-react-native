@@ -249,6 +249,8 @@ function resolvePurchaseTarget(
   },
 ): string | undefined {
   if ("packageId" in source) return source.packageId;
+  // Sample plans draw the screen when no offering loaded; nothing sells them.
+  if (context.plans.status === "sample") return undefined;
   if ("plan" in source) {
     return resolveUiIrPlan(context.plans, source.plan, context.currentIndex)
       ?.id;

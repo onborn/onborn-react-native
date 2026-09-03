@@ -746,6 +746,27 @@ export type BuilderV2UiIrNode =
       valueStyle?: BuilderV2UiIrStyle;
       unitStyle?: BuilderV2UiIrStyle;
       tickLabelStyle?: BuilderV2UiIrStyle;
+    })
+  /**
+   * The platform's switch as a view of one selection: on while the state
+   * equals `onValue`, and a flip writes `onValue` or null. The platform
+   * draws and animates it — React Native's Switch on a device,
+   * react-native-web's in a browser — so a toggle never degrades to two
+   * fills swapping colour.
+   */
+  | (NodeBase & {
+      type: "switch";
+      /** The screen state the switch is a view of. */
+      state: string;
+      /** The value the state holds while the switch is on. "on" by default. */
+      onValue?: string;
+      /** The track behind the thumb while on. */
+      trackColor?: string;
+      /** The track while off. */
+      offTrackColor?: string;
+      thumbColor?: string;
+      /** A light haptic per flip; requires the haptics capability. */
+      haptic?: boolean;
     });
 
 /** A point in the gradient's box, as fractions of its width and height. */
@@ -1028,6 +1049,15 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
         valueStyle: BuilderV2UiIrStyleSchema.optional(),
         unitStyle: BuilderV2UiIrStyleSchema.optional(),
         tickLabelStyle: BuilderV2UiIrStyleSchema.optional(),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("switch"),
+        state: z.string().trim().min(1).max(80),
+        onValue: z.string().trim().min(1).max(80).optional(),
+        trackColor: z.string().trim().min(1).max(120).optional(),
+        offTrackColor: z.string().trim().min(1).max(120).optional(),
+        thumbColor: z.string().trim().min(1).max(120).optional(),
+        haptic: z.boolean().optional(),
       }).strict(),
     ]),
 );

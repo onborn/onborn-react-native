@@ -31,6 +31,7 @@ import type { UiIrRendererPorts } from "../ports/ui-ir-renderer";
 import type { UiIrPlanSnapshot } from "../domain/ui-ir-plans";
 import type { UiIrAnswerStore } from "../domain/ui-ir-answers";
 import { UiIrJourneyProvider } from "./ui-ir-journey-progress-context";
+import { UiIrOverlayFrame } from "./ui-ir-overlay-frame";
 import { UiIrScreen } from "./ui-ir-screen";
 
 export type UiIrJourneyProps = {
@@ -141,20 +142,23 @@ export function UiIrJourney(props: UiIrJourneyProps): ReactElement {
       total={journey.total}
       variant={variant}
     >
-      {wrapped && chrome ? (
-        <UiIrChrome
-          activeScreenId={journey.activeScreenId}
-          answers={props.answers}
-          chrome={chrome}
-          document={props.document}
-          locale={props.locale}
-          plans={props.plans}
-          ports={rendererPorts}
-          renderSlot={() => screen}
-        />
-      ) : (
-        screen
-      )}
+      {/* The box a screen's sheets fill: the journey, chrome included. */}
+      <UiIrOverlayFrame>
+        {wrapped && chrome ? (
+          <UiIrChrome
+            activeScreenId={journey.activeScreenId}
+            answers={props.answers}
+            chrome={chrome}
+            document={props.document}
+            locale={props.locale}
+            plans={props.plans}
+            ports={rendererPorts}
+            renderSlot={() => screen}
+          />
+        ) : (
+          screen
+        )}
+      </UiIrOverlayFrame>
     </UiIrJourneyProvider>
   );
 }

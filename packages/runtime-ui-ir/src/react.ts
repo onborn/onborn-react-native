@@ -5,6 +5,7 @@ export { UiIrCarousel as Carousel } from "./components/ui-ir-carousel";
 export { UiIrChart as Chart } from "./components/ui-ir-chart";
 export { UiIrSegmentedControl as SegmentedControl } from "./components/ui-ir-segmented-control";
 export { UiIrRulerPicker as RulerPicker } from "./components/ui-ir-ruler-picker";
+export { UiIrSwitch as Switch } from "./components/ui-ir-switch";
 export { UiIrJourneyProgress as JourneyProgress } from "./components/ui-ir-journey-progress";
 export { UiIrProgressRing as ProgressRing } from "./components/ui-ir-progress-ring";
 export { UiIrVideo as Video } from "./components/ui-ir-video";

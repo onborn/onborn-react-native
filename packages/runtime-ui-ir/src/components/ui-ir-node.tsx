@@ -1,8 +1,7 @@
-import type { ReactElement } from "react";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
 import {
   Image,
   ImageBackground,
-  Modal,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -31,12 +30,14 @@ import { UiIrAnimatedView } from "./ui-ir-animated-view";
 import { UiIrCarousel } from "./ui-ir-carousel";
 import { UiIrSegmentedControl } from "./ui-ir-segmented-control";
 import { UiIrRulerPicker } from "./ui-ir-ruler-picker";
+import { UiIrSwitch } from "./ui-ir-switch";
 import { UiIrChart } from "./ui-ir-chart";
 import { UiIrLinearGradient } from "./ui-ir-linear-gradient";
 import { UiIrTextInput } from "./ui-ir-text-input";
 import { UiIrJourneyProgress } from "./ui-ir-journey-progress";
 import { UiIrProgressRing } from "./ui-ir-progress-ring";
 import { UiIrVideo } from "./ui-ir-video";
+import { UiIrModalSurface } from "./ui-ir-modal-surface";
 import { useUiIrJourneyProgressContext } from "./ui-ir-journey-progress-context";
 import type { UiIrVariables } from "../domain/ui-ir-answers";
 import { UiIrPhosphorIcon } from "./ui-ir-phosphor-icon";
@@ -62,6 +63,12 @@ type UiIrNodeProps = {
   assets: ReadonlyMap<string, BuilderV2UiIrAsset>;
   /** What the chrome's screen-slot renders: the journey's current screen. */
   renderSlot?: () => ReactElement;
+  /**
+   * Set on a sheet playing its exit: the presence gate has let go, the
+   * modal stays mounted for the length of the animation, and nothing in it
+   * takes a touch meanwhile.
+   */
+  sheetClosing?: boolean;
 };
 
 export function UiIrNode(props: UiIrNodeProps): ReactElement | null {
@@ -81,6 +88,15 @@ export function UiIrNode(props: UiIrNodeProps): ReactElement | null {
    * may report itself selected to a screen reader. Evaluated here, before the
    * per-type rendering, so every node type gets them for free.
    */
+  if (props.node.type === "modal" && props.node.presence) {
+    return (
+      <UiIrModalPresence
+        {...props}
+        node={props.node}
+        open={uiIrGateHolds(props.node.presence, gate)}
+      />
+    );
+  }
   if (props.node.presence && !uiIrGateHolds(props.node.presence, gate)) {
     return null;
   }
@@ -420,6 +436,19 @@ function renderNodeElement(
         />
       );
     /*
+     * The flip is the platform's animation, which the document cannot carry;
+     * the node names the state and the value that means "on".
+     */
+    case "switch":
+      return (
+        <UiIrSwitchNode
+          {...props}
+          common={common}
+          node={props.node}
+          nodeStyle={nodeStyle}
+        />
+      );
+    /*
      * One page per child, paged by the runtime because the page width is the
      * device's and the document may not read it.
      */
@@ -554,6 +583,48 @@ function UiIrRulerNode(
   );
 }
 
+function UiIrSwitchNode(
+  props: UiIrNodeProps & {
+    node: Extract<BuilderV2UiIrNode, { type: "switch" }>;
+    common: Record<string, unknown>;
+    nodeStyle: BuilderV2UiIrStyle | undefined;
+  },
+): ReactElement {
+  const screenState = useUiIrScreenState();
+  const { node } = props;
+  const value = screenState.values[node.state] ?? null;
+  return (
+    <UiIrSwitch
+      accessibilityLabel={props.common.accessibilityLabel as string | undefined}
+      offTrackColor={node.offTrackColor}
+      onChange={(next) => {
+        screenState.set(node.state, next);
+        // A light tap per flip, through the host's haptics like a Pressable's.
+        if (!node.haptic) return;
+        void Promise.resolve(
+          props.ports.handleAction({
+            screenId: props.screenId,
+            nodeId: node.id,
+            action: {
+              type: "capability.invoke",
+              capability: "haptics",
+              method: "trigger",
+              input: "light",
+            },
+          }),
+        ).catch(() => undefined);
+      }}
+      onValue={node.onValue}
+      style={asViewStyle(props.nodeStyle)}
+      thumbColor={node.thumbColor}
+      trackColor={node.trackColor}
+      value={value}
+    />
+  );
+}
+
+const FILL_SURFACE = { flex: 1 } as const;
+
 function UiIrModal(
   props: UiIrNodeProps & {
     node: Extract<BuilderV2UiIrNode, { type: "modal" }>;
@@ -564,9 +635,9 @@ function UiIrModal(
   const screenState = useUiIrScreenState();
   const { dismiss } = props.node;
   return (
-    <Modal
-      {...props.common}
-      animationType="slide"
+    <UiIrModalSurface
+      common={props.common}
+      open={props.sheetClosing !== true}
       /*
        * A selection never leaves the device, so the Pressable settles
        * `state.set` itself and the action handler has no case for it. The
@@ -584,13 +655,66 @@ function UiIrModal(
           action: dismiss,
         });
       }}
-      transparent
-      visible
     >
-      <View style={asViewStyle(props.nodeStyle)}>{renderChildren(props)}</View>
-    </Modal>
+      {/*
+       * Fills the surface. The Modal's child in the source is a plain View
+       * that carries no size of its own; on the web's in-frame layer it took
+       * its content's height, and a sheet meant to sit on the bottom edge
+       * sat on the top one with its scrim no taller than the card.
+       */}
+      <View style={[FILL_SURFACE, asViewStyle(props.nodeStyle)]}>
+        {renderChildren(props)}
+      </View>
+    </UiIrModalSurface>
   );
 }
+
+/*
+ * A sheet leaves the way it came. Its presence gate is a selection — the
+ * picker state — and the moment that changes the node would be gone from
+ * the tree with no frame to slide out in. The modal is kept mounted for the
+ * length of the exit and rendered without its gate, closing; then it goes.
+ */
+function UiIrModalPresence(
+  props: UiIrNodeProps & {
+    node: Extract<BuilderV2UiIrNode, { type: "modal" }>;
+    open: boolean;
+  },
+): ReactElement | null {
+  const { open, node } = props;
+  const [shown, setShown] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setShown(true);
+      return;
+    }
+    const timer = setTimeout(() => setShown(false), SHEET_MS);
+    return () => clearTimeout(timer);
+  }, [open]);
+  const ungated = useMemo(() => {
+    const copy = { ...node };
+    delete copy.presence;
+    return copy;
+  }, [node]);
+  if (!open && !shown) return null;
+  return <UiIrNode {...props} node={ungated} sheetClosing={!open} />;
+}
+
+// How long the platform modal takes to slide away; the node outlives its
+// gate by this much so the exit is seen.
+const SHEET_MS = 300;
+
+/*
+ * The scrim fades in where it is; the card slides up. One animation over
+ * the whole modal — the platform's "slide" — carried the scrim up with the
+ * card, and its top edge was seen climbing the screen behind the sheet.
+ *
+ * A sheet is written as a root that fills the modal, holding an
+ * absolutely-filled scrim beside the card. That is what is split: the
+ * absolute-fill children of the root go on the fading layer, the rest on
+ * the sliding one, which keeps the root's own layout (a flex-end column).
+ * Anything shaped differently fades and slides as one.
+ */
 
 function UiIrPlanRepeat(
   props: UiIrNodeProps & {

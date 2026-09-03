@@ -2,4 +2,4 @@
 // Run `yarn workspace @onborn/analytics sync-version` after bumping the version.
 
 /** Version of this SDK package, reported with every analytics event. */
-export const ONBORN_SDK_VERSION = "0.8.0-beta.1";
+export const ONBORN_SDK_VERSION = "0.8.0-beta.2";

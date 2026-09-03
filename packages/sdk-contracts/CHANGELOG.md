@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0-beta.2
+
+- Added the `switch` UI IR node.
+- `billing.samplePlans` on a paywall screen carries the designed plans into the artifact, for a device that cannot load any offering.
+- Web target renders `switch`.
+
 ## 0.8.0-beta.1
 
 - Added the `ruler-picker` UI IR node: a draggable ruler that writes its reading into a screen selection as a decimal string.

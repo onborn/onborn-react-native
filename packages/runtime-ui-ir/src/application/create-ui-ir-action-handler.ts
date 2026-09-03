@@ -35,7 +35,7 @@ export function createUiIrActionHandler(
         const packageId = context.resolvePurchaseTarget?.(action.source);
         if (!packageId) {
           throw new Error(
-            "UI IR purchase has no product: the offering has not loaded, or the plan the screen selected is not in it.",
+            "UI IR purchase has no product: the offering has not loaded, the paywall is showing its sample plans because none could be loaded, or the plan the screen selected is not in it.",
           );
         }
         await requiredBilling(ports).purchase({

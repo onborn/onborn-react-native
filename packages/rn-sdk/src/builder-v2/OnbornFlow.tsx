@@ -1,6 +1,7 @@
 import {
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -52,7 +53,12 @@ import { builtInHostCapabilities } from "./built-in-capabilities";
 import { OnbornLottie } from "./OnbornLottie";
 import { OnbornVideo } from "./OnbornVideo";
 import type { BuilderV2HostCapability } from "./runtime-manifest";
-import { readUiIrOfferingKey } from "@onborn/runtime-ui-ir";
+import {
+  readUiIrOfferingKey,
+  readUiIrSamplePlans,
+  withUiIrSamplePlans,
+  type UiIrPlan,
+} from "@onborn/runtime-ui-ir";
 import {
   ONBORN_BUILDER_V2_API_BASE_URL,
   resolveBuilderV2Environment,
@@ -125,6 +131,11 @@ export function OnbornUiIrPresentation(
    * than briefly showing the wrong offering's.
    */
   const [offeringKey, setOfferingKey] = useState<string | undefined>(undefined);
+  // What the presented paywall was designed around, once the document is in
+  // hand; shown only if no offering can be loaded at all.
+  const [samplePlans, setSamplePlans] = useState<
+    readonly UiIrPlan[] | undefined
+  >(undefined);
   const offering = useOnbornOffering({
     ...(offeringKey ? { offeringKey } : {}),
     // Purchases carry the flow so revenue lands on the flow that earned it.
@@ -139,15 +150,27 @@ export function OnbornUiIrPresentation(
 
   // The offering the dashboard configured, in the shape a paywall's price
   // bindings read. Recomputed as the store localizes, so a price appears the
-  // moment it is known rather than at the next mount.
+  // moment it is known rather than at the next mount. When nothing could be
+  // loaded — the request failed, or the project sells nothing yet — the
+  // paywall's own designed plans draw the screen instead of empty rows.
   const plans = useMemo(
     () =>
-      createBuilderV2PlanSnapshot({
-        loading: offering.loading,
-        packages: offering.packages,
-      }),
-    [offering.loading, offering.packages],
+      withUiIrSamplePlans(
+        createBuilderV2PlanSnapshot({
+          loading: offering.loading,
+          packages: offering.packages,
+        }),
+        samplePlans,
+      ),
+    [offering.loading, offering.packages, samplePlans],
   );
+  useEffect(() => {
+    if (plans.status !== "sample") return;
+    console.warn(
+      "[onborn] No offering could be loaded; the paywall shows its sample plans, which cannot be purchased." +
+        (offering.error ? ` (${offering.error})` : ""),
+    );
+  }, [offering.error, plans.status]);
 
   /*
    * What the flow may use: the SDK's own capabilities under whatever the app
@@ -209,12 +232,11 @@ export function OnbornUiIrPresentation(
     (session: ExpoUiIrRuntimeSession) => {
       // A standalone paywall may sell an offering of its own, so which one to
       // load depends on what is being presented, not on the document alone.
-      setOfferingKey(
-        readUiIrOfferingKey(
-          session.document,
-          props.placement ? { placement: props.placement } : undefined,
-        ),
-      );
+      const presentation = props.placement
+        ? { placement: props.placement }
+        : undefined;
+      setOfferingKey(readUiIrOfferingKey(session.document, presentation));
+      setSamplePlans(readUiIrSamplePlans(session.document, presentation));
     },
     [props.placement],
   );

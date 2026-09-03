@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   FlatList,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -41,6 +42,12 @@ const LABEL_WIDTH = 56;
  * landed on the device would be a form that only submits on the device.
  */
 const SETTLE_MS = 120;
+// A tap per tick, but not sixty a second: a fast flick crosses several ticks
+// per frame, and a haptic call for each of them stalled the scroll itself.
+const TICK_HAPTIC_GAP_MS = 45;
+/** Below this the strip stops where the finger left it; above, it coasts. */
+const FLICK_VELOCITY = 0.05;
+const SETTLES_BY_TIMER = Platform.OS === "web";
 
 type Tick = { index: number };
 
@@ -83,6 +90,13 @@ export function UiIrRulerPicker(props: {
   valueStyle?: StyleProp<TextStyle>;
   unitStyle?: StyleProp<TextStyle>;
   tickLabelStyle?: StyleProp<TextStyle>;
+  /**
+   * A tap per tick. Read by the compiler into the node, where the runtime's
+   * node wrapper answers it through the host's haptics (`onTick`); the
+   * component itself does nothing with it, but a screen writes it, so the
+   * type must take it.
+   */
+  haptic?: boolean;
   /** Fired as the indicator crosses a tick; the host answers with a haptic. */
   onTick?: () => void;
   accessibilityLabel?: string;
@@ -168,7 +182,13 @@ export function UiIrRulerPicker(props: {
         itemWidth: ITEM_WIDTH,
         count,
       });
-      if (Math.abs(offset - landed * ITEM_WIDTH) > 0.5) {
+      /*
+       * Only the web is nudged onto the tick. A device snaps natively
+       * (snapToInterval), and a programmatic animated scroll issued as that
+       * snap began collided with it: the strip froze between two ticks and
+       * took no touch until the sheet was reopened.
+       */
+      if (SETTLES_BY_TIMER && Math.abs(offset - landed * ITEM_WIDTH) > 0.5) {
         list.current?.scrollToOffset({
           offset: landed * ITEM_WIDTH,
           animated: true,
@@ -184,6 +204,7 @@ export function UiIrRulerPicker(props: {
     [count, onChange, range, value],
   );
 
+  const lastTickAt = useRef(0);
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!placed.current) return;
     const offset = event.nativeEvent.contentOffset.x;
@@ -195,8 +216,20 @@ export function UiIrRulerPicker(props: {
     if (under !== indexRef.current) {
       indexRef.current = under;
       setIndex(under);
-      onTick?.();
+      const now = Date.now();
+      if (now - lastTickAt.current >= TICK_HAPTIC_GAP_MS) {
+        lastTickAt.current = now;
+        onTick?.();
+      }
     }
+    /*
+     * Only the web needs to guess when a scroll is over: the browser sends
+     * scroll events and nothing else. A device says so itself — the drag
+     * ends, and if it ended with a flick, the momentum ends later — and a
+     * timer that guessed mid-flick dragged the strip back to wherever the
+     * events had paused.
+     */
+    if (!SETTLES_BY_TIMER) return;
     if (settle.current) clearTimeout(settle.current);
     settle.current = setTimeout(() => {
       settle.current = null;
@@ -210,6 +243,18 @@ export function UiIrRulerPicker(props: {
       settle.current = null;
     }
     finalize(event.nativeEvent.contentOffset.x);
+  };
+
+  /*
+   * The finger lifting is the end of the scroll only when it lifted still.
+   * A flick keeps the strip moving, and finalizing here scrolled it back to
+   * the tick under the finger — the reading ran 123, 128, 122 while the
+   * strip fought its own momentum. onMomentumScrollEnd finishes a flick.
+   */
+  const onDragEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const velocity = event.nativeEvent.velocity;
+    if (velocity && Math.abs(velocity.x) > FLICK_VELOCITY) return;
+    onScrollEnd(event);
   };
 
   const onLayout = (event: LayoutChangeEvent) => {
@@ -328,7 +373,7 @@ export function UiIrRulerPicker(props: {
             onContentSizeChange={onContentSizeChange}
             onMomentumScrollEnd={onScrollEnd}
             onScroll={onScroll}
-            onScrollEndDrag={onScrollEnd}
+            onScrollEndDrag={onDragEnd}
             overScrollMode="never"
             ref={list}
             renderItem={renderTick}

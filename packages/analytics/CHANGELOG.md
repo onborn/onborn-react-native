@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0-beta.2
+
+- Rebuilt against sdk-contracts 0.8.0-beta.2.
+
 ## 0.8.0-beta.1
 
 - Rebuilt against sdk-contracts 0.8.0-beta.1.

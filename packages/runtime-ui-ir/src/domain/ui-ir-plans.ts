@@ -16,7 +16,11 @@ export type UiIrPlan = {
 };
 
 export type UiIrPlanSnapshot = {
-  readonly status: "loading" | "ready" | "unavailable";
+  /**
+   * `sample` is the paywall's own designed plans, shown because no offering
+   * could be loaded; they draw the screen and cannot be bought.
+   */
+  readonly status: "loading" | "ready" | "unavailable" | "sample";
   readonly plans: readonly UiIrPlan[];
 };
 

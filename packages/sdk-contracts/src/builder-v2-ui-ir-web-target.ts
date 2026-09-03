@@ -46,6 +46,8 @@ export const BUILDER_V2_UI_IR_WEB_DISPOSITIONS: Readonly<
   carousel: "renders",
   "segmented-control": "renders",
   "ruler-picker": "renders",
+  // react-native-web draws its own switch, thumb transition included.
+  switch: "renders",
   modal: "renders",
   "billing-plans": "renders",
   lottie: "renders",

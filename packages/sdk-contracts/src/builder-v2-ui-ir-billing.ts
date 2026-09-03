@@ -47,12 +47,35 @@ export const BuilderV2UiIrPlanConditionSchema = z
   .strict();
 
 /**
+ * A plan the screen was designed around, in the shape a binding reads.
+ *
+ * The device answers a paywall's bindings from the loaded offering; these are
+ * what it answers with when no offering can be loaded at all — the request
+ * failed, or the project sells nothing yet — so the screen still shows the
+ * composition its author designed instead of empty rows. Never a substitute
+ * for a loaded price: a store that answered always wins, and a purchase
+ * from a sample is refused.
+ */
+export const BuilderV2UiIrPlanSampleSchema = z
+  .object({
+    title: z.string().trim().min(1).max(80),
+    price: z.string().trim().min(1).max(40),
+    period: z.string().trim().max(40).optional(),
+    trial: z.string().trim().max(60).optional(),
+    badge: z.string().trim().max(40).optional(),
+    description: z.string().trim().max(160).optional(),
+  })
+  .strict();
+
+/**
  * Which offering a paywall spends: a dashboard offering key, or the
- * environment's current one when omitted.
+ * environment's current one when omitted — and what it shows when neither
+ * can be loaded.
  */
 export const BuilderV2UiIrBillingBindingSchema = z
   .object({
     offeringKey: z.string().trim().min(1).max(160).optional(),
+    samplePlans: z.array(BuilderV2UiIrPlanSampleSchema).max(6).optional(),
   })
   .strict();
 
@@ -62,6 +85,9 @@ export type BuilderV2UiIrPlanField = z.infer<
 export type BuilderV2UiIrPlanRef = z.infer<typeof BuilderV2UiIrPlanRefSchema>;
 export type BuilderV2UiIrPlanCondition = z.infer<
   typeof BuilderV2UiIrPlanConditionSchema
+>;
+export type BuilderV2UiIrPlanSample = z.infer<
+  typeof BuilderV2UiIrPlanSampleSchema
 >;
 export type BuilderV2UiIrBillingBinding = z.infer<
   typeof BuilderV2UiIrBillingBindingSchema
