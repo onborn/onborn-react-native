@@ -1,9 +1,22 @@
 # Changelog
 
-## 0.7.0-beta.1
+## 0.8.0-beta.1
 
-- Artifact delivery may carry the experiment assignment (`experiment` on `BuilderV2UiIrArtifactDeliverySchema`), returned only to clients that ask (`assignment=1`).
-- Synced contracts with the platform: carousel/chart/Lottie nodes, host capabilities, paywall placements, instrumentation screen shapes.
+- Added the `ruler-picker` UI IR node: a draggable ruler that writes its reading into a screen selection as a decimal string.
+- Web target renders `ruler-picker`.
+
+## Unreleased
+
+- Added public Builder V2 runtime capability, signed artifact, release, private
+  delivery, and compatibility contracts for the React Native runtime.
+- Added the explicit Builder V2 source-project manifest and immutable
+  host-owned journey state contracts.
+- Added signed Builder V2 interaction manifests, host-owned runtime event
+  contracts, experiment attribution, and canonical interaction, exposure,
+  purchase, and restore analytics events.
+- Added the bounded runtime interaction capability. Generated source can invoke
+  only compiler-declared interaction IDs and cannot emit privileged billing or
+  experiment outcomes directly.
 
 ## 0.2.0-beta.1
 

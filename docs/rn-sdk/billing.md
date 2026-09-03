@@ -129,27 +129,6 @@ finish the transaction. Restore follows the same order: synchronize StoreKit
 or Google Play, reconcile with Onborn, then finish restored transactions. The
 host app must not call `finishTransaction` itself.
 
-## Load a configured paywall without rendering it
-
-`useOnbornPaywall` returns paywall metadata, its offering, localized products,
-selection state, purchase actions, and entitlement callbacks. Your app decides
-how to render every element.
-
-```tsx
-import { useOnbornPaywall } from "@onborn/billing";
-
-const paywall = useOnbornPaywall({
-  paywallId: "main-paywall",
-  billingAdapter,
-  onStartTrial(item) {
-    analytics.track("trial_selected", { packageId: item.package.id });
-  },
-  onPurchaseCompleted(result) {
-    closePaywall(result.entitlements);
-  },
-});
-```
-
 ### Shared hook callbacks
 
 | Callback | Description |
@@ -161,8 +140,8 @@ const paywall = useOnbornPaywall({
 | `onRestoreFailed(error)` | Restore failed. |
 | `onEntitlementsChanged(entitlements)` | Current server entitlements changed. |
 
-`useOnbornPaywall` additionally supports `onStartTrial`. Return `false` from
-that callback to stop the purchase flow.
+`useOnbornOffering` also supports `onStartTrial`. Return `false` from that
+callback to stop the purchase flow.
 
 ## Native-store adapter
 
@@ -181,24 +160,6 @@ Billing, `expo-iap`, `react-native-iap`, or a custom native purchase module.
 Return transaction identifiers, purchase tokens, receipts, and raw store data
 when available. Onborn validates the result server-side; a successful native
 purchase alone must not unlock premium access.
-
-## RevenueCat adapter
-
-Use `createRevenueCatBillingAdapter` only when the app already uses RevenueCat
-or is migrating gradually.
-
-```ts
-import { createRevenueCatBillingAdapter } from "@onborn/billing";
-import Purchases from "react-native-purchases";
-
-const billingAdapter = createRevenueCatBillingAdapter({
-  purchases: Purchases,
-});
-```
-
-The adapter identifies the user, maps Onborn packages to RevenueCat packages,
-purchases, restores, and forwards active entitlement/product identifiers to
-Onborn validation.
 
 ## Low-level client
 

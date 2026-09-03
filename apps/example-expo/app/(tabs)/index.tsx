@@ -1,67 +1,55 @@
-import {
-  Onborn,
-  SubscriptionFlow,
-  type NativeCustomStepRenderers,
-} from "@onborn/rn-sdk";
+import { Onborn, OnbornFlow } from "@onborn/rn-sdk";
 import Constants from "expo-constants";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DemoInitialLoading } from "@/components/demo-initial-loading";
-import { DemoNativeCustomStep } from "@/components/demo-native-custom-step";
 import {
   DemoPaymentStateScreen,
   type DemoPaymentState,
 } from "@/components/demo-payment-state-screen";
-import { createDemoBillingCallbacks } from "@/lib/demo-billing-callbacks";
 import { demoOnbornFetch } from "@/lib/onborn-demo-runtime";
-import {
-  resolveDemoPlatform,
-  useDemoMockBilling,
-} from "@/hooks/use-demo-mock-billing";
 
-const DEMO_SDK_API_KEY = process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY ?? "rubbish";
-const DEMO_FLOW_ID = process.env.EXPO_PUBLIC_ONBORN_FLOW_ID ?? "fitness_main";
-const DEMO_LOCALE = "pl";
+const DEMO_SDK_API_KEY = process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY ?? "";
+const DEMO_FLOW_ID = process.env.EXPO_PUBLIC_ONBORN_FLOW_ID ?? "";
+const DEMO_LOCALE = "en";
 const DEMO_APP_VERSION = "1.0.0";
-const customStepRenderers: NativeCustomStepRenderers = {
-  "demo-native-profile": DemoNativeCustomStep,
-  "custom-screen": DemoNativeCustomStep,
-};
 
+/**
+ * The whole integration: initialize once, render the flow.
+ *
+ * Screens, their order, and the paywall come from the published release, so
+ * nothing about them appears in this file. Purchases go through expo-iap
+ * inside the SDK; the app only reacts to the entitlements it is handed.
+ */
 export default function HomeScreen() {
-  const paywallShownRef = useRef(false);
+  const [ready, setReady] = useState(false);
   const [paymentState, setPaymentState] = useState<DemoPaymentState | null>(
     null,
   );
   const [flowRunId, setFlowRunId] = useState(0);
-  const platform = resolveDemoPlatform();
-  const deviceUserId = useMemo(() => {
-    const rawDeviceName = Constants.deviceName ?? "unknown-device";
-    const normalizedDeviceName = rawDeviceName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-");
-    return `device-${platform}-${normalizedDeviceName}`;
-  }, [platform]);
 
-  const billing = useDemoMockBilling();
-  const billingCallbacks = useMemo(
-    () =>
-      createDemoBillingCallbacks({
-        setPaymentState,
-      }),
-    [],
-  );
-  Onborn.init({
-    apiKey: DEMO_SDK_API_KEY,
-    userId: deviceUserId,
-    locale: DEMO_LOCALE,
-    platform,
-    appVersion: DEMO_APP_VERSION,
-    fetchImpl: demoOnbornFetch,
-  });
+  const userId = useMemo(() => {
+    const rawDeviceName = Constants.deviceName ?? "unknown-device";
+    return `device-${rawDeviceName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Onborn.initAsync({
+      apiKey: DEMO_SDK_API_KEY,
+      userId,
+      locale: DEMO_LOCALE,
+      appVersion: DEMO_APP_VERSION,
+      fetchImpl: demoOnbornFetch,
+    }).then(() => {
+      if (!cancelled) setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   const resetDemo = useCallback(() => {
-    paywallShownRef.current = false;
     setPaymentState(null);
     setFlowRunId((value) => value + 1);
   }, []);
@@ -70,33 +58,55 @@ export default function HomeScreen() {
     return <DemoPaymentStateScreen state={paymentState} onReset={resetDemo} />;
   }
 
+  if (!ready) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator color="#ffffff" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <SubscriptionFlow
+      <OnbornFlow
         key={flowRunId}
         flowId={DEMO_FLOW_ID}
-        fallbackTemplate="fitness"
-        InitialLoadingComponent={DemoInitialLoading}
-        billingAdapter={billing.billingAdapter}
-        customStepRenderers={customStepRenderers}
-        onCustomStepMissing={({ rendererKey }) => {
-          console.warn(`Missing ONBORN native custom renderer: ${rendererKey}`);
-        }}
-        onPaywallShown={() => {
-          paywallShownRef.current = true;
-        }}
-        onFlowCompleted={() => {
-          if (!paywallShownRef.current) {
-            return;
-          }
-          setPaymentState((current) =>
-            current ?? {
-              type: "neutral",
-              message: "User closed or completed the paywall without payment.",
-            },
+        // Video and haptics come with the SDK; an app lends capabilities only
+        // for what needs its own permissions or screens (camera, sign-in).
+        onEntitlementsChanged={(entitlements) => {
+          const active = entitlements.filter((entitlement) => entitlement.active);
+          setPaymentState(
+            active.length > 0
+              ? { type: "success", entitlementCount: active.length }
+              : {
+                  type: "neutral",
+                  message: "No active entitlement after this purchase.",
+                },
           );
         }}
-        {...billingCallbacks}
+        onComplete={() => {
+          setPaymentState((current) =>
+            current ?? { type: "neutral", message: "Flow completed." },
+          );
+        }}
+        onDismiss={() => {
+          setPaymentState((current) =>
+            current ?? { type: "neutral", message: "Flow dismissed." },
+          );
+        }}
+        renderLoading={() => (
+          <View style={[styles.container, styles.centered]}>
+            <ActivityIndicator color="#ffffff" />
+          </View>
+        )}
+        renderError={(error, retry) => (
+          <View style={[styles.container, styles.centered]}>
+            <Text style={styles.errorText}>{error.message}</Text>
+            <Pressable onPress={retry} style={styles.retry}>
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          </View>
+        )}
       />
     </View>
   );
@@ -106,5 +116,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000000",
+  },
+  centered: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    padding: 24,
+  },
+  errorText: {
+    color: "#ffffff",
+    textAlign: "center",
+  },
+  retry: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: "#ffffff",
+  },
+  retryText: {
+    color: "#000000",
+    fontWeight: "600",
   },
 });

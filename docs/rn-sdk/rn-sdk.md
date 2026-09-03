@@ -1,65 +1,46 @@
-# ONBORN React Native SDK
+# Onborn React Native SDK
 
-The ONBORN React Native SDK renders published onboarding flows and paywalls inside a React Native or Expo app.
+`@onborn/rn-sdk` renders published Onborn onboarding flows and paywalls in
+Expo and bare React Native apps. Builder V2 ships signed UI IR artifacts, so
+the host app keeps Metro, Expo Router, EAS Update, and its existing build
+pipeline.
 
-Main package: `@onborn/rn-sdk`
+The SDK owns:
 
-Primary runtime components:
+- the Onborn API URL and environment resolution;
+- artifact download, Ed25519 verification, compatibility checks, and caching;
+- React Native rendering for supported UI IR capabilities;
+- localization and journey navigation;
+- automatic interaction analytics;
+- offering resolution, Expo IAP purchases, restores, validation, and
+  entitlement refresh.
 
-- `SubscriptionFlow` for onboarding flows with optional attached paywall.
-- `SubscriptionPaywall` for standalone paywalls.
-- `useOnbornPaywall` for headless/custom paywall runtime.
-- Billing adapters for mock billing, RevenueCat, and custom native-store implementations.
+The host app provides an SDK API key and application context. It does not pass
+an API URL, artifact key, offering ID, billing adapter, or UI component map.
 
-Apps with fully custom onboarding and paywall UI should use the lighter
-[`@onborn/billing`](./billing.md) package instead of installing this renderer.
+## Install
 
-## Install package
+### Expo
 
 Yarn:
 
 ```sh
-yarn add @onborn/rn-sdk
+yarn add @onborn/rn-sdk expo-file-system expo-iap react-native-reanimated react-native-worklets
 ```
 
 NPM:
 
 ```sh
-npm install @onborn/rn-sdk
+npm install @onborn/rn-sdk expo-file-system expo-iap react-native-reanimated react-native-worklets
 ```
 
 PNPM:
 
 ```sh
-pnpm add @onborn/rn-sdk
+pnpm add @onborn/rn-sdk expo-file-system expo-iap react-native-reanimated react-native-worklets
 ```
 
-The SDK owns the Onborn API URL. Apps provide an SDK API key and runtime
-context, not a backend base URL.
-
-## Expo setup
-
-Required peer dependencies:
-
-Yarn:
-
-```sh
-yarn add react-native-reanimated react-native-worklets
-```
-
-NPM:
-
-```sh
-npm install react-native-reanimated react-native-worklets
-```
-
-PNPM:
-
-```sh
-pnpm add react-native-reanimated react-native-worklets
-```
-
-Reanimated requires the babel plugin. Keep it last:
+Keep the Reanimated plugin last:
 
 ```js
 module.exports = {
@@ -68,522 +49,233 @@ module.exports = {
 };
 ```
 
-Optional dependencies:
+Use an Expo development build. Expo Go is not supported because native billing
+and runtime dependencies must be included in the application binary.
 
-Yarn:
+### Bare React Native
 
-```sh
-yarn add lottie-react-native
-```
-
-NPM:
+Bare React Native projects must have Expo Modules configured:
 
 ```sh
-npm install lottie-react-native
-```
-
-PNPM:
-
-```sh
-pnpm add lottie-react-native
-```
-
-Use `lottie-react-native` only if your flows include animated assets.
-
-The SDK bundles `react-native-safe-area-context`, `react-native-svg`, `expo-font`,
-`expo-image`, `expo-linear-gradient`, `expo-localization`, `expo-store-review`,
-`expo-video`, Tamagui, and supported font packages. Install those directly only
-if your app uses them outside Onborn.
-
-Expo apps are the primary supported path. Use an Expo development build. Expo Go
-is not supported for a real Onborn integration because Reanimated, Worklets,
-optional Lottie, and native billing modules must be included in your app binary.
-
-## Bare React Native setup
-
-Bare React Native apps can use the SDK, but they must support Expo Modules
-because the runtime uses Expo packages for images, fonts, gradients,
-localization, store review, and video primitives.
-
-```sh
-yarn add react-native-reanimated react-native-worklets
+yarn add @onborn/rn-sdk expo-file-system expo-iap react-native-reanimated react-native-worklets
 npx pod-install
 ```
 
-NPM:
-
-```sh
-npm install react-native-reanimated react-native-worklets
-npx pod-install
-```
-
-PNPM:
-
-```sh
-pnpm add react-native-reanimated react-native-worklets
-pnpm exec pod-install
-```
+Keep the Reanimated plugin last:
 
 ```js
 module.exports = {
   presets: ["module:@react-native/babel-preset"],
-  plugins: [
-    // Must stay last.
-    "react-native-reanimated/plugin",
-  ],
+  plugins: ["react-native-reanimated/plugin"],
 };
 ```
 
-Bare RN checklist:
-
-- Confirm Expo Modules autolinking is configured.
-- Run pods after installing native packages.
-- Keep the Reanimated babel plugin last.
-- Rebuild the native app after dependency changes.
-- Install `lottie-react-native` only if your published flows use animated assets.
-
-## Quick Start
-
-```tsx
-import { Onborn, SubscriptionFlow } from "@onborn/rn-sdk";
-import { View } from "react-native";
-
-Onborn.init({
-  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
-  userId: "user-123",
-  locale: "en",
-  platform: "ios",
-  appVersion: "1.0.0",
-});
-
-export function OnboardingScreen() {
-  return (
-    <View style={{ flex: 1 }}>
-      <SubscriptionFlow flowId="default-onboarding" />
-    </View>
-  );
-}
-```
-
-The backend decides which published flow or experiment variant should be returned.
+Rebuild the native app after adding or changing native dependencies.
 
 ## Initialize Once
 
-Initialize the SDK once before rendering Onborn components or using Onborn
-hooks. Runtime fields such as `apiKey`, `userId`, `locale`, `platform`, and
-`appVersion` belong in `Onborn.init`, not component props.
+Call `Onborn.initAsync` before rendering an Onborn flow:
 
 ```ts
 import { Onborn } from "@onborn/rn-sdk";
 
-Onborn.init({
+await Onborn.initAsync({
   apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
-  userId: currentUser.id,
+  userId: currentUser?.id,
   locale: "en",
-  platform: "ios",
   appVersion: "1.0.0",
 });
 ```
 
-The SDK does not accept API keys through component props or hook arguments.
+`initAsync` persists the generated anonymous id on the device when the app has
+no `userId` yet. The synchronous `init` generates a new one on every cold
+start, which breaks funnel stitching, retention, and experiment assignment.
 
-## Standalone Paywall
+The SDK does not accept an API key through component props or hook arguments.
+`cf_test_` keys load test releases and `cf_live_` keys load production
+releases.
+
+### Initialization Options
+
+| Option | Type | Required | Purpose |
+| --- | --- | --- | --- |
+| `apiKey` | `string` | Yes | Project SDK key with a supported environment prefix. |
+| `userId` | `string` | No | Stable application user identifier. |
+| `locale` | `string` | No | Preferred locale. The flow falls back to its default locale. |
+| `platform` | `"ios" \| "android" \| "web"` | No | Analytics platform context. Native artifact target is resolved from React Native. |
+| `appId` | `string` | No | Host application identifier used by analytics. |
+| `country` | `string` | No | Optional country context. |
+| `userType` | `"new" \| "returning"` | No | Optional analytics segmentation. |
+| `appVersion` | `string` | No | Host application version. |
+| `emitAnalyticsEvents` | `boolean` | No | Set to `false` to disable automatic analytics. Defaults to enabled. |
+| `autoFlushMs` | `number` | No | Analytics auto-flush interval. |
+| `fetchImpl` | `typeof fetch` | No | Test-only or specialized fetch implementation. |
+
+## Render a Flow
 
 ```tsx
-import { SubscriptionPaywall } from "@onborn/rn-sdk";
-import { View } from "react-native";
+import { OnbornFlow } from "@onborn/rn-sdk";
 
-export function PaywallScreen() {
+export function OnboardingScreen() {
   return (
-    <View style={{ flex: 1 }}>
-      <SubscriptionPaywall
-        paywallId="main-paywall"
-      />
-    </View>
-  );
-}
-```
-
-Standalone paywalls are useful for feature gates, settings screens, or upgrade screens that are not part of an onboarding flow.
-
-## Initial Loading Component
-
-Use `InitialLoadingComponent` to control the first loading state while the SDK fetches initial runtime JSON.
-
-```tsx
-import type { InitialLoadingComponentProps } from "@onborn/rn-sdk";
-import { ActivityIndicator, Text, View } from "react-native";
-
-function OnbornLoading({ kind, flowId, paywallId }: InitialLoadingComponentProps) {
-  const target = kind === "flow" ? flowId : paywallId;
-
-  return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-      <ActivityIndicator />
-      <Text>Loading {target}</Text>
-    </View>
-  );
-}
-
-<SubscriptionFlow
-  flowId={flowId}
-  InitialLoadingComponent={OnbornLoading}
-/>;
-```
-
-## Runtime Context
-
-Set these fields in `Onborn.init` whenever possible:
-
-```ts
-Onborn.init({
-  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
-  userId: user.id,
-  locale: "en",
-  platform: "ios",
-  country: "US",
-  appVersion: "1.0.0",
-  userType: "new",
-});
-```
-
-These values are used for:
-
-- published runtime selection and mobile debugging,
-- experiment targeting,
-- localized runtime payloads,
-- platform-specific billing products.
-
-## Runtime analytics behavior
-
-The React Native SDK emits flow, step, paywall, purchase, restore, and legal-link
-events automatically. For app builds, keep analytics enabled because Insights,
-Analytics, Experiments, benchmarks, and assistant recommendations depend on
-complete event data.
-
-Disable runtime analytics only for internal previews or test harnesses:
-
-```tsx
-import { Onborn, SubscriptionFlow } from "@onborn/rn-sdk";
-
-Onborn.init({
-  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
-  emitAnalyticsEvents: false,
-  emitSdkConnectionSignal: false,
-});
-
-<SubscriptionFlow flowId={flowId} />;
-```
-
-For app usage, keep analytics enabled.
-
-In `@onborn/rn-sdk`, analytics queue storage is backed by AsyncStorage by
-default. Events can survive an app restart and flush when connectivity returns.
-The queue is capped by default to avoid unbounded local storage growth.
-The SDK also flushes analytics when the app moves between active/background
-states and when the flow/paywall component unmounts.
-
-For event schemas, metric definitions, and standalone event tracking, see
-[`analytics.md`](./analytics.md).
-
-## Billing
-
-The SDK renders paywalls, package selectors, restore buttons, and purchase CTAs. The host app is responsible for providing a billing adapter.
-
-All billing hooks and adapters below are reexported from `@onborn/billing`.
-Use that package directly when your app owns the UI and does not need
-`SubscriptionFlow` or `SubscriptionPaywall`.
-
-### Mock Billing
-
-Use mock billing for test flows and demo apps.
-
-```tsx
-import { createMockBillingAdapter, SubscriptionFlow } from "@onborn/rn-sdk";
-import { useMemo } from "react";
-
-function Screen() {
-  const billingAdapter = useMemo(
-    () =>
-      createMockBillingAdapter({
-        transactionIdPrefix: "demo",
-        purchaseDelayMs: 400,
-      }),
-    [],
-  );
-
-  return (
-    <SubscriptionFlow
-      flowId={flowId}
-      billingAdapter={billingAdapter}
+    <OnbornFlow
+      flowId="default-onboarding"
+      onComplete={() => finishOnboarding()}
+      onDismiss={() => closeOnboarding()}
+      onEntitlementsChanged={(entitlements) => {
+        updatePremiumState(entitlements.some((item) => item.active));
+      }}
     />
   );
 }
 ```
 
-### RevenueCat
+`OnbornFlow` may contain onboarding screens and a paywall in one published
+journey. Standalone Builder V2 paywalls are delivered through a flow assigned
+to the required placement.
 
-Use RevenueCat when the host app already uses RevenueCat as the subscription
-provider or when you are migrating gradually. New apps that want Onborn to own
-paywalls, analytics, entitlement state, and experimentation should usually start
-with the native-store adapter instead.
+### OnbornFlow Props
 
-```tsx
-import {
-  configureRevenueCatPurchases,
-  createRevenueCatBillingAdapter,
-  SubscriptionPaywall,
-} from "@onborn/rn-sdk";
-import Purchases from "react-native-purchases";
+| Prop | Type | Required | Purpose |
+| --- | --- | --- | --- |
+| `flowId` | `string` | Yes | Published Builder V2 flow identifier. |
+| `initialScreenId` | `string` | No | Opens a specific screen when the artifact contains it. |
+| `locale` | `string` | No | Overrides the locale from `Onborn.init` for this flow. |
+| `onComplete` | `() => void` | No | Called after the journey completes. |
+| `onDismiss` | `() => void` | No | Called when the journey requests dismissal. |
+| `onEntitlementsChanged` | `(entitlements) => void` | No | Called after validated purchase or restore changes entitlement state. |
+| `renderLoading` | `() => ReactNode` | No | Custom initial loading UI. |
+| `renderError` | `(error, retry) => ReactNode` | No | Custom fail-closed error UI with an explicit retry callback. |
+| `capabilities` | `OnbornHostCapabilities` | No | Native abilities this app lends to the flow: `notifications`, `camera`, `haptics`. |
 
-await configureRevenueCatPurchases({
-  purchases: Purchases,
-  billing: runtimeBillingConfig,
-  platform: "ios",
-  userId,
-});
+### Lending Capabilities
 
-const billingAdapter = createRevenueCatBillingAdapter({
-  purchases: Purchases,
-});
-
-<SubscriptionPaywall
-  paywallId={paywallId}
-  billingAdapter={billingAdapter}
-/>;
-```
-
-RevenueCat package matching uses the ONBORN package/product data returned by the backend and RevenueCat offerings from the native SDK.
-
-### Native Stores
-
-Use `createNativeStoresBillingAdapter` if the host app talks directly to
-Apple/Google purchases or uses a package such as `expo-iap` or
-`react-native-iap`.
-
-Onborn owns paywall rendering, package selection analytics, purchase validation,
-and entitlement records. Your app owns the native store purchase sheet and
-returns product/purchase evidence to Onborn.
+Notifications, camera, and haptics need native modules, config plugins, and
+permission strings that belong to the host app, so the SDK carries the app's
+implementation rather than bundling one. The host manifest promises the server
+exactly the capabilities that arrived in this prop, so a flow requiring one the
+app did not lend is never served to that app.
 
 ```tsx
-import { createNativeStoresBillingAdapter } from "@onborn/rn-sdk";
+import type { OnbornHostCapabilities } from "@onborn/rn-sdk";
 
-const billingAdapter = createNativeStoresBillingAdapter({
-  async loadProducts({ storeProductIds }) {
-    const products = await loadProductsFromNativeStore(storeProductIds);
-
-    return products.map((product) => ({
-      storeProductId: product.id,
-      title: product.title,
-      description: product.description,
-      price: product.displayPrice,
-      currency: product.currency,
-      raw: product,
-    }));
-  },
-  async purchaseProduct({ storeProductId }) {
-    const purchase = await purchaseFromNativeStore(storeProductId);
-
-    return {
-      storeProductId,
-      transactionId: purchase.transactionId,
-      purchaseToken: purchase.purchaseToken,
-      raw: purchase,
-    };
-  },
-  async restorePurchases() {
-    const purchases = await restoreFromNativeStore();
-
-    return {
-      purchases: purchases.map((purchase) => ({
-        store: purchase.platform === "ios" ? "app_store" : "google_play",
-        storeProductId: purchase.productId,
-        transactionId: purchase.transactionId,
-        purchaseToken: purchase.purchaseToken,
-        raw: purchase,
-      })),
-      raw: purchases,
-    };
-  },
-});
-```
-
-ONBORN validates purchase/restore results with the backend. The host app should
-pass store identifiers, transaction identifiers, purchase tokens, receipts, and
-restored purchases where available.
-
-Production checklist:
-
-- create products in App Store Connect and Google Play Console,
-- connect store product ids to packages in Onborn Billing,
-- pass the same stable `userId` to the SDK, billing adapter, and your backend,
-- return localized price metadata from `loadProducts`,
-- test purchase, trial, cancel, failure, restore, entitlement callbacks, server
-  entitlement checks, and webhooks in the test environment before promoting to
-  prod.
-
-## Billing Callbacks
-
-```tsx
-<SubscriptionFlow
-  flowId={flowId}
-  billingAdapter={billingAdapter}
-  onStartTrial={(item) => {
-    // Return false to stop the SDK from continuing into purchase flow.
-  }}
-  onPurchaseStarted={(item) => {}}
-  onPurchaseCompleted={(result) => {}}
-  onPurchaseFailed={(error) => {}}
-  onRestoreCompleted={(result) => {}}
-  onRestoreFailed={(error) => {}}
-  onEntitlementsChanged={(entitlements) => {}}
-  onPaywallShown={({ paywallId, paywallName, stepId }) => {}}
-/>
-```
-
-If a paywall is attached in the middle of an onboarding flow and purchase validates successfully, the SDK continues to the next step unless step navigation is disabled.
-
-## Custom Native Steps
-
-Use custom renderers for steps that need app-native UI or functionality outside ONBORN primitives.
-
-```tsx
-import {
-  SubscriptionFlow,
-  type NativeCustomStepRenderers,
-  type NativeCustomStepRendererProps,
-} from "@onborn/rn-sdk";
-import { Text, View } from "react-native";
-
-function ProfileStep({ actions }: NativeCustomStepRendererProps) {
-  return (
-    <View>
-      <Text>Native profile setup</Text>
-      <Button title="Continue" onPress={() => actions.next()} />
-    </View>
-  );
-}
-
-const customStepRenderers: NativeCustomStepRenderers = {
-  "profile-step": ProfileStep,
+const capabilities: OnbornHostCapabilities = {
+  haptics: { async trigger(style) { await impact(style); } },
 };
 
-<SubscriptionFlow
-  flowId={flowId}
-  customStepRenderers={customStepRenderers}
-  onCustomStepMissing={({ rendererKey }) => {
-    console.warn(`Missing native custom renderer: ${rendererKey}`);
-  }}
+<OnbornFlow flowId={flowId} capabilities={capabilities} />;
+```
+
+## Artifact Delivery and Offline Behavior
+
+The SDK requests:
+
+```text
+GET /runtime/v2/flows/:flowId/artifact?target=ios|android&userId=...&sessionId=...
+```
+
+The identity parameters are what an experiment assigns on. Without them the
+request is anonymous and a running experiment cannot split traffic.
+
+The response contains release metadata, a signed artifact URL, integrity
+metadata, and the artifact signature. Before rendering, the SDK:
+
+1. checks runtime and capability compatibility;
+2. downloads the artifact;
+3. verifies its SHA-256 integrity;
+4. verifies the Ed25519 signature with the embedded trusted public key;
+5. validates the UI IR document;
+6. stores the verified artifact as the last-known-good release.
+
+An unsigned, modified, incompatible, or invalid artifact is never rendered. If
+the network is unavailable, the SDK may use a previously verified compatible
+artifact. Without one, `renderError` receives the failure.
+
+## Automatic Analytics
+
+The publication compiler emits signed instrumentation together with UI IR.
+The runtime uses only that verified instrumentation to report:
+
+- flow and screen views;
+- continue, back, complete, and dismiss navigation;
+- declared button and selection interactions;
+- paywall views;
+- purchase, cancellation, failure, and restore outcomes.
+
+The host app does not add analytics handlers to generated controls. Set
+`emitAnalyticsEvents: false` in `Onborn.init` only when automatic runtime
+analytics must be disabled.
+
+Use `@onborn/analytics` directly when the app owns all onboarding and paywall
+UI and needs standalone product analytics without the renderer.
+
+## Automatic Billing
+
+Builder V2 billing uses the current Onborn offering and the Expo IAP native
+store adapter. Generated paywall actions automatically:
+
+1. load the active offering and store products;
+2. open the native purchase sheet;
+3. submit the transaction to Onborn for validation;
+4. finish only a backend-validated purchase;
+5. refresh entitlements;
+6. report updated entitlements through `onEntitlementsChanged`.
+
+Restore follows the same validation rule. A native success response alone does
+not grant premium access.
+
+The host app does not pass:
+
+- `offeringId`;
+- `billingAdapter`;
+- product IDs;
+- receipt validation callbacks.
+
+Use `@onborn/billing` instead of the full renderer when the app owns its custom
+paywall UI but still needs Onborn offerings, native purchases, restores, and
+entitlements.
+
+## Capability Compatibility
+
+Every artifact declares the capabilities and runtime version it requires. The
+SDK declares the capabilities built into the installed version. A release is
+rendered only when those sets are compatible.
+
+The first public UI IR runtime supports:
+
+- assets and images;
+- safe-area layout;
+- localization;
+- journey navigation;
+- signed analytics instrumentation;
+- automatic billing actions;
+- host-lent notifications, camera, and haptics, when the app supplies them.
+
+Capabilities are additive and versioned. Unsupported behavior fails before
+render instead of being silently ignored.
+
+## Error Handling
+
+Provide a product-specific error state:
+
+```tsx
+<OnbornFlow
+  flowId="default-onboarding"
+  renderError={(error, retry) => (
+    <ErrorState
+      title="Onboarding is unavailable"
+      detail={error.message}
+      onRetry={retry}
+    />
+  )}
 />;
 ```
 
-Custom renderers receive:
+Do not unlock premium content from UI callbacks alone. Treat the entitlement
+state returned after backend validation as authoritative.
 
-- `step`
-- `theme`
-- `layout`
-- current `values`
-- navigation/actions
-- helpers for rendering ONBORN primitives inside custom UI
+## Beta Environment
 
-## Cache and Offline Behavior
-
-`SubscriptionFlow` uses `AsyncStorage` cache by default.
-
-Runtime strategy:
-
-1. Fetch latest published flow from backend.
-2. Cache valid flow response.
-3. If network fails, use cached flow.
-4. If no cache exists and `fallbackTemplate` is provided, use fallback.
-
-```tsx
-<SubscriptionFlow
-  flowId={flowId}
-  fallbackTemplate="fitness"
-/>
-```
-
-Fallback templates are a safety net, not the recommended production path.
-
-## Testing and Staging
-
-Current beta SDK runtime URL behavior:
-
-- beta package uses `https://api.testing.onborn.app`
-- production package will use `https://api.onborn.app`
-
-The runtime API URL is owned by the package. Customers should not pass an
-`apiBaseUrl`. They initialize the SDK once with `Onborn.init`, then pass only
-surface identifiers such as `flowId` or `paywallId` to rendered SDK components.
-
-Local demo apps can still inject an internal `fetchImpl` while developing:
-
-```tsx
-import { Onborn, SubscriptionFlow } from "@onborn/rn-sdk";
-
-const testingFetch: typeof fetch = (input, init) => {
-  const url = String(input).replace(
-    "https://api.testing.onborn.app",
-    "http://localhost:3002",
-  );
-  return fetch(url, init);
-};
-
-Onborn.init({
-  apiKey: process.env.EXPO_PUBLIC_ONBORN_SDK_API_KEY!,
-  fetchImpl: testingFetch,
-});
-
-<SubscriptionFlow
-  flowId={flowId}
-/>;
-```
-
-## Troubleshooting
-
-### Prices show fallback values
-
-Usually the billing adapter did not localize products.
-
-Check:
-
-- products have `storeProductId`,
-- RevenueCat/native store returns matching product ids,
-- `billingAdapter.loadProducts` runs,
-- the selected platform matches product configuration.
-
-### Paywall purchase button does nothing
-
-Check:
-
-- `billingAdapter` is provided,
-- selected package has a product,
-- native purchase implementation resolves or throws,
-- backend purchase validation endpoint is configured.
-
-### Flow returns 404
-
-Check:
-
-- the flow is published,
-- SDK API key belongs to the correct project/app,
-- `flowId` is the public runtime id expected by backend,
-- testing/prod API URL points to the right environment.
-
-### Images do not render
-
-Check:
-
-- image asset exists in storage,
-- backend returns a usable `src`,
-- signed URL did not expire before runtime,
-- device can reach the asset URL.
-
-### Custom native step is blank
-
-Check:
-
-- step type is `native_custom`,
-- `native.rendererKey` matches `customStepRenderers`,
-- `onCustomStepMissing` logs missing keys.
+Current beta packages use the Onborn testing API internally. Applications do
+not configure a base URL. Production packages will switch the internal
+production endpoint as part of the release process.

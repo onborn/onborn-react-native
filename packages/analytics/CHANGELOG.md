@@ -1,9 +1,16 @@
 # Changelog
 
-## 0.7.0-beta.1
+## 0.8.0-beta.1
 
-- The UI IR analytics bridge stamps every event with the session's experiment assignment and reports `experiment_exposed` once, at journey start.
-- Synced instrumentation and runtime mapping with the platform.
+- Rebuilt against sdk-contracts 0.8.0-beta.1.
+
+## Unreleased
+
+- Added the Builder V2 runtime event adapter with artifact, release, screen,
+  interaction, and experiment attribution.
+- Added canonical `runtime_interaction_triggered` and `experiment_exposed`
+  events while keeping the analytics transport and privileged outcomes owned by
+  the host runtime.
 
 ## 0.2.0-beta.1
 

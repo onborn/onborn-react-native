@@ -46,7 +46,9 @@ import {
   createOnbornCapabilityPort,
   hostCapabilityNames,
   type OnbornHostCapabilities,
+  mergeHostCapabilities,
 } from "./host-capabilities";
+import { builtInHostCapabilities } from "./built-in-capabilities";
 import { OnbornLottie } from "./OnbornLottie";
 import { OnbornVideo } from "./OnbornVideo";
 import type { BuilderV2HostCapability } from "./runtime-manifest";
@@ -147,9 +149,16 @@ export function OnbornUiIrPresentation(
     [offering.loading, offering.packages],
   );
 
-  const hostCapabilityNamesKey = hostCapabilityNames(props.capabilities).join(
-    ",",
+  /*
+   * What the flow may use: the SDK's own capabilities under whatever the app
+   * lent. Declared to the server as one list, so a flow that plays a clip
+   * is served to every app carrying this SDK, lent player or not.
+   */
+  const capabilities = useMemo(
+    () => mergeHostCapabilities(builtInHostCapabilities(), props.capabilities),
+    [props.capabilities],
   );
+  const hostCapabilityNamesKey = hostCapabilityNames(capabilities).join(",");
   const input = useMemo(
     () => ({
       flowId: props.flowId,
@@ -190,7 +199,7 @@ export function OnbornUiIrPresentation(
     offeringRef,
     target,
     callbacks,
-    capabilities: props.capabilities,
+    capabilities,
   });
 
   // Stable across renders: an inline callback used to hand the remote flow a
@@ -212,15 +221,15 @@ export function OnbornUiIrPresentation(
 
   return (
     <EnsureSafeAreaInsets>
-    <ExpoUiIrRemoteFlow
-      input={input}
-      dependencies={dependencies}
-      locale={props.locale ?? config.locale}
-      plans={plans}
-      onSessionReady={handleSessionReady}
-      renderLoading={props.renderLoading}
-      renderError={props.renderError}
-    />
+      <ExpoUiIrRemoteFlow
+        input={input}
+        dependencies={dependencies}
+        locale={props.locale ?? config.locale}
+        plans={plans}
+        onSessionReady={handleSessionReady}
+        renderLoading={props.renderLoading}
+        renderError={props.renderError}
+      />
     </EnsureSafeAreaInsets>
   );
 }
@@ -293,7 +302,13 @@ function useRuntimeDependencies(input: {
         ...(input.appVersion ? { appVersion: input.appVersion } : {}),
         sessionId: sessionId.current,
       }),
-    [input.apiKey, input.appVersion, input.country, input.fetchImpl, input.userId],
+    [
+      input.apiKey,
+      input.appVersion,
+      input.country,
+      input.fetchImpl,
+      input.userId,
+    ],
   );
   const control = useMemo(
     () =>

@@ -19,10 +19,5 @@
     "prettier": "^3.7.4",
     "turbo": "^2.9.12",
     "typescript": "5.9.2"
-  },
-  "resolutions": {
-    "react-native": "0.86.2",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
   }
 }

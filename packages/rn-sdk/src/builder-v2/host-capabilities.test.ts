@@ -253,7 +253,12 @@ test("lent auth callbacks are promised and routed", async () => {
  */
 test("a lent video player is promised and renders the node through the port", () => {
   const VideoView = () => null;
-  const useVideoPlayer = () => ({ loop: true, muted: true, play() {}, pause() {} });
+  const useVideoPlayer = () => ({
+    loop: true,
+    muted: true,
+    play() {},
+    pause() {},
+  });
   const capabilities = { video: { VideoView, useVideoPlayer } };
   const rendered: unknown[] = [];
 
@@ -270,7 +275,11 @@ test("a lent video player is promised and renders the node through the port", ()
     nodeId: "clip",
     capability: "video",
     component: "VideoView",
-    props: { uri: "file:///cache/clip.mp4", loop: false, resizeMode: "contain" },
+    props: {
+      uri: "file:///cache/clip.mp4",
+      loop: false,
+      resizeMode: "contain",
+    },
   });
 
   assert.deepEqual(rendered, [
@@ -284,7 +293,10 @@ test("a lent video player is promised and renders the node through the port", ()
   ]);
   assert.throws(
     () =>
-      createOnbornCapabilityPort({ lottie: { LottieView: () => null } }, RENDERERS)?.render({
+      createOnbornCapabilityPort(
+        { lottie: { LottieView: () => null } },
+        RENDERERS,
+      )?.render({
         screenId: "thankYou",
         nodeId: "clip",
         capability: "video",
@@ -292,5 +304,25 @@ test("a lent video player is promised and renders the node through the port", ()
         props: { uri: "file:///cache/clip.mp4" },
       }),
     /did not lend a video player/,
+  );
+});
+
+test("the app's lent capabilities win over the SDK's built-in ones", async () => {
+  const { mergeHostCapabilities, hostCapabilityNames } =
+    await import("./host-capabilities");
+  const builtIn = {
+    haptics: { trigger: async () => undefined },
+    video: { VideoView: () => null, useVideoPlayer: () => ({}) },
+  } as never;
+  const lent = { haptics: { trigger: async () => "lent" } } as never;
+  const merged = mergeHostCapabilities(builtIn, lent);
+  assert.deepEqual(hostCapabilityNames(merged).sort(), ["haptics", "video"]);
+  assert.equal(
+    await (merged.haptics as { trigger(): Promise<unknown> }).trigger(),
+    "lent",
+  );
+  assert.deepEqual(
+    hostCapabilityNames(mergeHostCapabilities(builtIn, undefined)).sort(),
+    ["haptics", "video"],
   );
 });

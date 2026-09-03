@@ -139,7 +139,9 @@ export const BuilderV2UiIrCssAnimationKeysSchema = z
       .enum(["normal", "reverse", "alternate", "alternate-reverse"])
       .optional(),
     animationTimingFunction: CssTimingFunctionSchema.optional(),
-    animationFillMode: z.enum(["none", "forwards", "backwards", "both"]).optional(),
+    animationFillMode: z
+      .enum(["none", "forwards", "backwards", "both"])
+      .optional(),
   })
   .partial()
   .passthrough();
@@ -711,6 +713,39 @@ export type BuilderV2UiIrNode =
       pillStyle?: BuilderV2UiIrStyle;
       labelStyle?: BuilderV2UiIrStyle;
       selectedLabelStyle?: BuilderV2UiIrStyle;
+    })
+  /**
+   * A ruler the person drags to pick a number — weight, height, age.
+   *
+   * The commonest sheet in a fitness onboarding, and one the document could
+   * not carry: the drag is a gesture, the snap is momentum, and the big
+   * number follows the ticks under the pointer. The document names the range
+   * and the state the reading is written to; the runtime owns the ticks, the
+   * snap, the haptic per tick and the counting number. The reading lands in
+   * the state as a decimal string, so copy can speak it back and analytics
+   * reports it like any other answer.
+   */
+  | (NodeBase & {
+      type: "ruler-picker";
+      /** The screen state the reading is written to, as a decimal string. */
+      state: string;
+      min: number;
+      max: number;
+      step: number;
+      /** Drawn after the number — "kg", "cm", "lbs". */
+      unit?: string;
+      /** Decimals the reading keeps; derived from the step when absent. */
+      fractionDigits?: number;
+      /** Every Nth tick is tall and labelled. Ten by default. */
+      majorEvery?: number;
+      /** A light haptic per tick; requires the haptics capability. */
+      haptic?: boolean;
+      tickColor?: string;
+      majorTickColor?: string;
+      indicatorColor?: string;
+      valueStyle?: BuilderV2UiIrStyle;
+      unitStyle?: BuilderV2UiIrStyle;
+      tickLabelStyle?: BuilderV2UiIrStyle;
     });
 
 /** A point in the gradient's box, as fractions of its width and height. */
@@ -976,6 +1011,23 @@ export const BuilderV2UiIrNodeSchema: z.ZodType<BuilderV2UiIrNode> = z.lazy(
         pillStyle: BuilderV2UiIrStyleSchema.optional(),
         labelStyle: BuilderV2UiIrStyleSchema.optional(),
         selectedLabelStyle: BuilderV2UiIrStyleSchema.optional(),
+      }).strict(),
+      CommonNodeSchema.extend({
+        type: z.literal("ruler-picker"),
+        state: z.string().trim().min(1).max(80),
+        min: z.number().finite(),
+        max: z.number().finite(),
+        step: z.number().finite().positive(),
+        unit: z.string().trim().max(12).optional(),
+        fractionDigits: z.number().int().min(0).max(3).optional(),
+        majorEvery: z.number().int().min(2).max(50).optional(),
+        haptic: z.boolean().optional(),
+        tickColor: z.string().trim().min(1).max(120).optional(),
+        majorTickColor: z.string().trim().min(1).max(120).optional(),
+        indicatorColor: z.string().trim().min(1).max(120).optional(),
+        valueStyle: BuilderV2UiIrStyleSchema.optional(),
+        unitStyle: BuilderV2UiIrStyleSchema.optional(),
+        tickLabelStyle: BuilderV2UiIrStyleSchema.optional(),
       }).strict(),
     ]),
 );

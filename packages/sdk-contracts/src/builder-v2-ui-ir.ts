@@ -34,7 +34,11 @@ export const BuilderV2UiIrScreenSchema = z
     screenId: UiIrIdSchema,
     surface: BuilderV2ProjectSurfaceSchema,
     /** The delivery channels this screen exists on; absent means both. */
-    channels: z.array(z.enum(["app", "web"])).min(1).max(2).optional(),
+    channels: z
+      .array(z.enum(["app", "web"]))
+      .min(1)
+      .max(2)
+      .optional(),
     placement: z.string().trim().min(1).max(120).optional(),
     /**
      * Presented by the app rather than walked to.
@@ -96,7 +100,8 @@ export const BuilderV2UiIrScreenSchema = z
     if (countSlots(screen.root) > 0) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Only the chrome places the screen; a screen has no screen-slot",
+        message:
+          "Only the chrome places the screen; a screen has no screen-slot",
         path: ["root"],
       });
     }
@@ -291,11 +296,17 @@ export const BuilderV2UiIrDocumentSchema = z
       });
     }
     const standalone = new Set(
-      document.screens.filter((screen) => screen.standalone).map((screen) => screen.screenId),
+      document.screens
+        .filter((screen) => screen.standalone)
+        .map((screen) => screen.screenId),
     );
     document.screens.forEach((screen, index) => {
       (screen.next ?? []).forEach((route, routeIndex) => {
-        if (!screenIds.has(route.to) || standalone.has(route.to) || route.to === screen.screenId) {
+        if (
+          !screenIds.has(route.to) ||
+          standalone.has(route.to) ||
+          route.to === screen.screenId
+        ) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message: `Route to "${route.to}" from "${screen.screenId}" does not lead to a screen the journey can walk to`,
@@ -368,6 +379,26 @@ function addPlaceholderIssues(
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: `Text placeholder "{{${placeholder.name}}}" names a state no screen declares; a field has to write it before copy can read it.`,
+          path: ["screens", screenIndex, "root"],
+        });
+      }
+    }
+    /*
+     * A ruler's range is checked here rather than on the node: the node
+     * schema sits in a discriminated union, which admits plain objects only.
+     */
+    if (node.type === "ruler-picker") {
+      if (!(node.max > node.min)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "A ruler's max must be above its min.",
+          path: ["screens", screenIndex, "root"],
+        });
+      } else if ((node.max - node.min) / node.step > 5000) {
+        // Past a few thousand ticks the strip is a scroll nobody finishes.
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "A ruler may have at most 5000 steps between min and max.",
           path: ["screens", screenIndex, "root"],
         });
       }

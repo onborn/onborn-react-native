@@ -1,10 +1,10 @@
 # Changelog
 
-## 0.6.0-beta.1
+## 0.7.0-beta.1
 
-- `HttpUiIrArtifactDelivery` reports `country`/`appVersion` and always requests the experiment assignment stamp.
-- `refreshUiIrArtifact` returns the delivery's `experiment` assignment (network paths only; offline last-known-good carries none).
-- Synced runtime with the platform: carousel, chart, Lottie, asset resolver.
+- Added `RulerPicker`, exported from `@onborn/runtime-ui-ir/react`, with snapping, a haptic per tick and the counting number.
+- `SegmentedControl` and `RulerPicker` accept canvas markers for their styled parts.
+- Video clips are declared among a document's assets, so a screen that plays one no longer fails with "asset is not declared".
 
 ## 0.2.0-beta.1
 

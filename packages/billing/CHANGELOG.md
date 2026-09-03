@@ -1,8 +1,14 @@
 # Changelog
 
-## 0.6.0-beta.1
+## 0.7.0-beta.1
 
-- Synced with the platform: plan snapshots for paywall price bindings; V1 paywall hook removed.
+- Rebuilt against sdk-contracts 0.8.0-beta.1 and runtime-ui-ir 0.7.0-beta.1.
+
+## Unreleased
+
+- Removed the RevenueCat adapter and its public API. Onborn billing now uses
+  direct StoreKit and Google Play integrations through the official Expo IAP
+  adapter or a custom native-store adapter.
 
 ## 0.1.0-beta.9
 

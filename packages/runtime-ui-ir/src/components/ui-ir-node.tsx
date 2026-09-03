@@ -30,6 +30,7 @@ import { createUiIrNodeCommonProps } from "./ui-ir-node-props";
 import { UiIrAnimatedView } from "./ui-ir-animated-view";
 import { UiIrCarousel } from "./ui-ir-carousel";
 import { UiIrSegmentedControl } from "./ui-ir-segmented-control";
+import { UiIrRulerPicker } from "./ui-ir-ruler-picker";
 import { UiIrChart } from "./ui-ir-chart";
 import { UiIrLinearGradient } from "./ui-ir-linear-gradient";
 import { UiIrTextInput } from "./ui-ir-text-input";
@@ -226,7 +227,12 @@ function renderNodeElement(
           node={props.node}
           placeholder={
             props.node.placeholder
-              ? resolveUiIrNodeText(props, props.node.placeholder, plans, variables)
+              ? resolveUiIrNodeText(
+                  props,
+                  props.node.placeholder,
+                  plans,
+                  variables,
+                )
               : undefined
           }
           ports={props.ports}
@@ -247,7 +253,11 @@ function renderNodeElement(
       return (
         <UiIrVideo
           accessibilityLabel={common.accessibilityLabel}
-          host={{ ports: props.ports, screenId: props.screenId, nodeId: props.node.id }}
+          host={{
+            ports: props.ports,
+            screenId: props.screenId,
+            nodeId: props.node.id,
+          }}
           loop={props.node.loop}
           muted={props.node.muted}
           resizeMode={props.node.resizeMode}
@@ -396,6 +406,20 @@ function renderNodeElement(
         />
       );
     /*
+     * The document names the range and the state; the runtime owns the drag,
+     * the snap and the counting number, because a gesture is motion the
+     * document cannot carry.
+     */
+    case "ruler-picker":
+      return (
+        <UiIrRulerNode
+          {...props}
+          common={common}
+          node={props.node}
+          nodeStyle={nodeStyle}
+        />
+      );
+    /*
      * One page per child, paged by the runtime because the page width is the
      * device's and the document may not read it.
      */
@@ -466,11 +490,66 @@ function UiIrSegmentedNode(
       pillStyle={asViewStyle(props.node.pillStyle)}
       segments={props.node.segments.map((segment) => ({
         value: segment.value,
-        label: resolveUiIrNodeText(props, segment.label, props.plans, variables),
+        label: resolveUiIrNodeText(
+          props,
+          segment.label,
+          props.plans,
+          variables,
+        ),
       }))}
       selected={selected}
       selectedLabelStyle={asTextStyle(props.node.selectedLabelStyle)}
       style={asViewStyle(props.nodeStyle)}
+    />
+  );
+}
+
+function UiIrRulerNode(
+  props: UiIrNodeProps & {
+    node: Extract<BuilderV2UiIrNode, { type: "ruler-picker" }>;
+    common: Record<string, unknown>;
+    nodeStyle: BuilderV2UiIrStyle | undefined;
+  },
+): ReactElement {
+  const screenState = useUiIrScreenState();
+  const { node } = props;
+  const value = screenState.values[node.state] ?? null;
+  // A light tap per tick, through the host's haptics like a Pressable's.
+  const onTick = node.haptic
+    ? () => {
+        void Promise.resolve(
+          props.ports.handleAction({
+            screenId: props.screenId,
+            nodeId: node.id,
+            action: {
+              type: "capability.invoke",
+              capability: "haptics",
+              method: "trigger",
+              input: "light",
+            },
+          }),
+        ).catch(() => undefined);
+      }
+    : undefined;
+  return (
+    <UiIrRulerPicker
+      accessibilityLabel={props.common.accessibilityLabel as string | undefined}
+      fractionDigits={node.fractionDigits}
+      indicatorColor={node.indicatorColor}
+      majorEvery={node.majorEvery}
+      majorTickColor={node.majorTickColor}
+      max={node.max}
+      min={node.min}
+      onChange={(reading) => screenState.set(node.state, reading)}
+      onTick={onTick}
+      step={node.step}
+      style={asViewStyle(props.nodeStyle)}
+      tickColor={node.tickColor}
+      tickLabelStyle={asTextStyle(node.tickLabelStyle)}
+      unit={node.unit}
+      unitStyle={asTextStyle(node.unitStyle)}
+      value={value}
+      valueStyle={asTextStyle(node.valueStyle)}
     />
   );
 }
@@ -589,7 +668,9 @@ function resolveLottie(
   if (!entry) {
     // The document contract forbids this; a document that slipped past it
     // should fail loudly rather than draw a blank where the artwork was.
-    throw new Error(`UI IR lottie animation "${assetId}" is not in the document.`);
+    throw new Error(
+      `UI IR lottie animation "${assetId}" is not in the document.`,
+    );
   }
   return entry.animation as BuilderV2UiIrJsonValue;
 }

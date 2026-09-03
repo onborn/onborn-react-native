@@ -4,7 +4,9 @@ Public React Native SDK repository for Onborn onboarding flows, paywalls, and an
 
 ## React Native SDK
 
-Render Onborn onboarding flows and paywalls in React Native / Expo apps.
+Render signed Onborn Builder V2 flows and paywalls in React Native / Expo apps.
+The full SDK owns artifact verification, analytics, native billing, restores,
+and entitlements.
 
 Start with the full SDK documentation:
 
@@ -27,14 +29,16 @@ entitlements.
 
 ## Example App
 
-The Expo example app lives in `apps/example-expo` and demonstrates:
+The Expo example app in `apps/example-expo` remains a legacy V1 compatibility
+fixture while the Builder V2 release-candidate host is prepared. New
+integrations should follow the `OnbornFlow` quick start above.
 
-- rendering an onboarding flow,
-- rendering a standalone paywall,
-- mock billing,
-- custom loading UI,
-- native custom step rendering,
-- Lottie animated assets.
+It demonstrates the APIs kept during the V1 compatibility window:
+
+- `SubscriptionFlow` and `SubscriptionPaywall`;
+- custom loading UI;
+- native custom-step rendering;
+- optional Lottie assets.
 
 ```sh
 yarn install
@@ -47,10 +51,3 @@ yarn workspace @onborn/example-expo start
 public SDK packages.
 
 - [SDK contracts documentation](docs/rn-sdk/sdk-contracts.md)
-
-## License
-
-This repository is source-available, not open source. All rights are
-reserved by Onborn; see [LICENSE](LICENSE). You may read the code here, but
-use of the SDK in your app is licensed only through the official `@onborn/*`
-packages published on npm, under the Onborn terms of service.

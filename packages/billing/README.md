@@ -37,7 +37,7 @@ server validation hand-off, and transaction finishing. Host apps keep only
 their paywall UI and entitlement-driven navigation.
 
 Always pass the returned `billingAdapter` directly to `useOnbornOffering` or
-`useOnbornPaywall`. Do not replace it with `undefined` while `connected` is
+`useOnbornOffering`. Do not replace it with `undefined` while `connected` is
 false; native operations already wait for the store connection internally.
 
 The package owns the Onborn API URL. Configure credentials and user context

@@ -8,21 +8,19 @@ cd "$ROOT_DIR"
 
 PACKAGE_DIRS=(
   "packages/sdk-contracts"
-  "packages/runtime-ui-ir"
-  "packages/runtime-expo-ui-ir"
   "packages/analytics"
   "packages/billing"
+  "packages/runtime-ui-ir"
+  "packages/runtime-expo-ui-ir"
   "packages/rn-sdk"
 )
 
-# Dependency order. rn-sdk imports both runtime packages, so their dist has to
-# exist before its tsc runs.
 BUILD_ORDER=(
   "@onborn/sdk-contracts"
-  "@onborn/runtime-ui-ir"
-  "@onborn/runtime-expo-ui-ir"
   "@onborn/analytics"
   "@onborn/billing"
+  "@onborn/runtime-ui-ir"
+  "@onborn/runtime-expo-ui-ir"
   "@onborn/rn-sdk"
 )
 
@@ -30,6 +28,18 @@ for package_name in "${BUILD_ORDER[@]}"; do
   yarn workspace "$package_name" check-types
   yarn workspace "$package_name" lint
   yarn workspace "$package_name" build
+done
+
+TEST_PACKAGES=(
+  "@onborn/sdk-contracts"
+  "@onborn/analytics"
+  "@onborn/runtime-ui-ir"
+  "@onborn/runtime-expo-ui-ir"
+  "@onborn/rn-sdk"
+)
+
+for package_name in "${TEST_PACKAGES[@]}"; do
+  yarn workspace "$package_name" test
 done
 
 for package_dir in "${PACKAGE_DIRS[@]}"; do

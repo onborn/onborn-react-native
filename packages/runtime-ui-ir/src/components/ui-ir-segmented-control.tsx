@@ -36,6 +36,12 @@ export function UiIrSegmentedControl(props: {
   labelStyle?: StyleProp<TextStyle>;
   selectedLabelStyle?: StyleProp<TextStyle>;
   accessibilityLabel?: string;
+  /** Canvas markers (react-native-web data attributes); see the harness. */
+  dataSet?: Record<string, string>;
+  slotDataSets?: {
+    pill?: Record<string, string>;
+    label?: Record<string, string>;
+  };
 }): ReactElement {
   const [trackWidth, setTrackWidth] = useState(0);
   const position = useRef(new Animated.Value(0)).current;
@@ -79,11 +85,15 @@ export function UiIrSegmentedControl(props: {
       {...(props.accessibilityLabel
         ? { accessibilityLabel: props.accessibilityLabel }
         : {})}
+      {...(props.dataSet ? { dataSet: props.dataSet } : {})}
       style={props.style}
     >
       <View onLayout={onTrackLayout} style={styles.track}>
         {segmentWidth > 0 && hasSelection ? (
           <Animated.View
+            {...(props.slotDataSets?.pill
+              ? { dataSet: props.slotDataSets.pill }
+              : {})}
             style={[
               styles.pill,
               props.pillStyle,
@@ -103,6 +113,9 @@ export function UiIrSegmentedControl(props: {
               style={styles.segment}
             >
               <Text
+                {...(props.slotDataSets?.label
+                  ? { dataSet: props.slotDataSets.label }
+                  : {})}
                 style={[
                   styles.label,
                   props.labelStyle,

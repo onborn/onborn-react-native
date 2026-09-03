@@ -10,6 +10,10 @@ SDKs:
 - analytics event payloads,
 - billing runtime request/response payloads,
 - runtime experiment assignment payloads.
+- Builder V2 host capability manifests,
+- Builder V2 signed artifact, release, and private delivery payloads,
+- Builder V2 runtime compatibility evaluation,
+- Builder V2 ordered source-project and host-owned journey contracts.
 
 It must not expose backend, dashboard, builder, AI, provider credential, or
 template-management contracts. Keep those in private internal workspace

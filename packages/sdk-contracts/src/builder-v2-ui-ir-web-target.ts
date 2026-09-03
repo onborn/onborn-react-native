@@ -45,6 +45,7 @@ export const BUILDER_V2_UI_IR_WEB_DISPOSITIONS: Readonly<
   chart: "renders",
   carousel: "renders",
   "segmented-control": "renders",
+  "ruler-picker": "renders",
   modal: "renders",
   "billing-plans": "renders",
   lottie: "renders",

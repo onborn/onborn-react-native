@@ -143,6 +143,18 @@ const CAPABILITY_METHODS: {
   video: () => undefined,
 };
 
+/**
+ * The app's own capabilities over the SDK's built-in ones, the way React
+ * merges props: an app that lends its own haptics keeps them, one that lends
+ * nothing still has the SDK's. See built-in-capabilities.ts.
+ */
+export function mergeHostCapabilities(
+  builtIn: OnbornHostCapabilities,
+  lent: OnbornHostCapabilities | undefined,
+): OnbornHostCapabilities {
+  return { ...builtIn, ...(lent ?? {}) };
+}
+
 export function hostCapabilityNames(
   capabilities: OnbornHostCapabilities | undefined,
 ): BuilderV2HostCapability[] {

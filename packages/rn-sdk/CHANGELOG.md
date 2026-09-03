@@ -1,10 +1,18 @@
 # Changelog
 
-## 0.7.0-beta.1
+## 0.8.0-beta.1
 
-- Experiment measurement loop: the SDK forwards `userId`/`country`/`appVersion` to artifact delivery and stamps all flow events with the served experiment assignment.
-- Synced with the platform: Lottie capability, standalone `OnbornPaywall`, host capabilities.
-- Peers now require RN >= 0.86, reanimated >= 4.5, worklets >= 0.10, `expo-file-system` >= 57, `expo-iap` >= 5 (Expo SDK 57 line).
+- Built-in capabilities: `expo-haptics` and `expo-video` ship with the SDK, so a flow that plays a clip or taps on a picker reaches every app carrying the SDK without an app release. Lottie is picked up automatically when `lottie-react-native` is installed. Capabilities lent through the `capabilities` prop still win.
+- New native dependency `expo-haptics`: run `pod install` after upgrading.
+
+## 0.3.0-beta.1
+
+- Added `OnbornFlow` for signed Builder V2 UI IR delivery.
+- Added automatic analytics instrumentation from signed release metadata.
+- Added automatic Expo IAP purchase, restore, validation, and entitlement
+  handling.
+- Added strict host capability negotiation and last-known-good recovery.
+- Kept API keys and backend URLs out of component props.
 
 ## 0.2.0-beta.2
 
