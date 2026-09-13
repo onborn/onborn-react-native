@@ -22,6 +22,18 @@ export class HttpUiIrArtifactDelivery implements UiIrArtifactDeliveryPort {
        */
       country?: string;
       appVersion?: string;
+      /**
+       * A specific release of the flow instead of the live one: the builder's
+       * preview of an experiment variant, whose release is served by
+       * assignment in production and by name here.
+       */
+      releaseId?: string;
+      /**
+       * An experiment variant to preview by name, resolved server-side to
+       * whatever release the variant currently serves — so a preview link
+       * outlives the variant's next publish.
+       */
+      variantId?: string;
     },
   ) {}
 
@@ -43,6 +55,12 @@ export class HttpUiIrArtifactDelivery implements UiIrArtifactDeliveryPort {
     }
     if (this.config.appVersion) {
       url.searchParams.set("appVersion", this.config.appVersion);
+    }
+    if (this.config.releaseId) {
+      url.searchParams.set("release", this.config.releaseId);
+    }
+    if (this.config.variantId) {
+      url.searchParams.set("variant", this.config.variantId);
     }
     // This client's schema knows the experiment field, so it always asks for
     // the assignment stamp; servers ignore the flag when nothing is running.

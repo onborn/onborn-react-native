@@ -48,3 +48,26 @@ test("omits identity parameters that were not supplied", async () => {
   assert.equal(url.searchParams.has("userId"), false);
   assert.equal(url.searchParams.has("sessionId"), false);
 });
+
+test("names the previewed release or variant, and neither by default", async () => {
+  const { urls, fetchImpl } = recordingFetch();
+  await new HttpUiIrArtifactDelivery({
+    apiBaseUrl: "https://api.example.com",
+    apiKey: "cf_test_key",
+    fetchImpl,
+  }).fetchArtifact({ flowId: "flow-1", target: "web" });
+  await new HttpUiIrArtifactDelivery({
+    apiBaseUrl: "https://api.example.com",
+    apiKey: "cf_test_key",
+    fetchImpl,
+    releaseId: "release-9",
+    variantId: "variant-3",
+  }).fetchArtifact({ flowId: "flow-1", target: "web" });
+
+  const plain = new URL(urls[0] ?? "");
+  assert.equal(plain.searchParams.get("release"), null);
+  assert.equal(plain.searchParams.get("variant"), null);
+  const named = new URL(urls[1] ?? "");
+  assert.equal(named.searchParams.get("release"), "release-9");
+  assert.equal(named.searchParams.get("variant"), "variant-3");
+});

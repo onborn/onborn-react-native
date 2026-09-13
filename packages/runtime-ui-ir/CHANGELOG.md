@@ -2,6 +2,8 @@
 
 ## 0.7.0-beta.3
 
+- `HttpUiIrArtifactDelivery` accepts `releaseId`, sent as `release`, to fetch a named release of the flow instead of the live one (the builder's preview of an experiment variant).
+- `HttpUiIrArtifactDelivery` accepts `variantId`, sent as `variant`, to fetch whatever release an experiment variant currently serves — a preview link that survives the variant's next publish.
 - Added `Switch`, exported from `@onborn/runtime-ui-ir/react`: the platform's switch as a view of one screen selection (`value`/`onChange` on a `useState<string | null>`, on while it equals `onValue`), with the native thumb animation on device and web.
 - A paywall whose offering cannot be loaded at all (request failed, or nothing sold yet) renders the sample plans its author designed instead of empty rows; `UiIrPlanSnapshot.status` gains `sample`, and a purchase from a sample plan is refused. A loading or loaded offering is never replaced.
 
